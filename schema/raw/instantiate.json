@@ -3,6 +3,17 @@
   "title": "InstantiateMsg",
   "type": "object",
   "properties": {
+    "action": {
+      "description": "Optinal action in case the contract is instantiated via the claimdrop factory",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CampaignAction"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "owner": {
       "description": "Owner of the contract. If not set, it is the sender of the Instantiate message.",
       "type": [
@@ -11,5 +22,220 @@
       ]
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "definitions": {
+    "CampaignAction": {
+      "description": "The campaign action that can be executed with the [ExecuteMsg::ManageCampaign] message.",
+      "oneOf": [
+        {
+          "description": "Creates a new campaign",
+          "type": "object",
+          "required": [
+            "create_campaign"
+          ],
+          "properties": {
+            "create_campaign": {
+              "type": "object",
+              "required": [
+                "params"
+              ],
+              "properties": {
+                "params": {
+                  "description": "The parameters to create a campaign with",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/CampaignParams"
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Closes the campaign",
+          "type": "object",
+          "required": [
+            "close_campaign"
+          ],
+          "properties": {
+            "close_campaign": {
+              "type": "object",
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CampaignParams": {
+      "description": "Represents the parameters to create a campaign with.",
+      "type": "object",
+      "required": [
+        "description",
+        "distribution_type",
+        "end_time",
+        "name",
+        "reward_denom",
+        "start_time",
+        "total_reward",
+        "type"
+      ],
+      "properties": {
+        "description": {
+          "description": "The campaign description",
+          "type": "string"
+        },
+        "distribution_type": {
+          "description": "The ways the reward is distributed, which are defined by the [DistributionType]. The sum of the percentages must be 100.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DistributionType"
+          }
+        },
+        "end_time": {
+          "description": "The campaign end timestamp (unix timestamp), in seconds",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "name": {
+          "description": "The campaign name",
+          "type": "string"
+        },
+        "reward_denom": {
+          "description": "The denom to be distributed as reward by the campaign",
+          "type": "string"
+        },
+        "start_time": {
+          "description": "The campaign start time (unix timestamp), in seconds",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "total_reward": {
+          "description": "The total amount of the reward asset that is intended to be allocated to the campaign",
+          "allOf": [
+            {
+              "$ref": "#/definitions/Coin"
+            }
+          ]
+        },
+        "type": {
+          "description": "Campaign type. Value used by front ends.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Coin": {
+      "type": "object",
+      "required": [
+        "amount",
+        "denom"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/definitions/Uint128"
+        },
+        "denom": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Decimal": {
+      "description": "A fixed-point decimal value with 18 fractional digits, i.e. Decimal(1_000_000_000_000_000_000) == 1.0\n\nThe greatest possible value that can be represented is 340282366920938463463.374607431768211455 (which is (2^128 - 1) / 10^18)",
+      "type": "string"
+    },
+    "DistributionType": {
+      "oneOf": [
+        {
+          "description": "The distribution is done in a linear vesting schedule",
+          "type": "object",
+          "required": [
+            "linear_vesting"
+          ],
+          "properties": {
+            "linear_vesting": {
+              "type": "object",
+              "required": [
+                "end_time",
+                "percentage",
+                "start_time"
+              ],
+              "properties": {
+                "cliff_duration": {
+                  "description": "The duration of the cliff, in seconds",
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "uint64",
+                  "minimum": 0.0
+                },
+                "end_time": {
+                  "description": "The unix timestamp when this distribution type ends, in seconds",
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                },
+                "percentage": {
+                  "description": "The percentage of the total reward to be distributed with a linear vesting schedule",
+                  "allOf": [
+                    {
+                      "$ref": "#/definitions/Decimal"
+                    }
+                  ]
+                },
+                "start_time": {
+                  "description": "The unix timestamp when this distribution type starts, in seconds",
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "The distribution is done in a single lump sum, i.e. no vesting period",
+          "type": "object",
+          "required": [
+            "lump_sum"
+          ],
+          "properties": {
+            "lump_sum": {
+              "type": "object",
+              "required": [
+                "percentage",
+                "start_time"
+              ],
+              "properties": {
+                "percentage": {
+                  "$ref": "#/definitions/Decimal"
+                },
+                "start_time": {
+                  "description": "The unix timestamp when this distribution type starts, in seconds",
+                  "type": "integer",
+                  "format": "uint64",
+                  "minimum": 0.0
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Uint128": {
+      "description": "A thin wrapper around u128 that is using strings for JSON encoding/decoding, such that the full u128 range can be used for clients that convert JSON numbers to floats, like JavaScript and jq.\n\n# Examples\n\nUse `from` to create instances of this and `u128` to get the value out:\n\n``` # use cosmwasm_std::Uint128; let a = Uint128::from(123u128); assert_eq!(a.u128(), 123);\n\nlet b = Uint128::from(42u64); assert_eq!(b.u128(), 42);\n\nlet c = Uint128::from(70u32); assert_eq!(c.u128(), 70); ```",
+      "type": "string"
+    }
+  }
 }

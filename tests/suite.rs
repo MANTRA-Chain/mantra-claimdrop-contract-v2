@@ -104,7 +104,10 @@ impl TestingSuite {
 
     #[track_caller]
     pub fn instantiate_claimdrop_contract(&mut self, owner: Option<String>) -> &mut Self {
-        let msg = InstantiateMsg { owner };
+        let msg = InstantiateMsg {
+            owner,
+            action: None,
+        };
 
         let claimdrop_contract_code_id = self.app.store_code(claimdrop_contract());
         let admin = self.admin();
