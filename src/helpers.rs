@@ -17,6 +17,23 @@ pub(crate) fn validate_campaign_params(
     campaign_params.validate_campaign_distribution()?;
     campaign_params.validate_rewards()?;
 
+    // Additional validation for Lump Sum distributions
+    // The external validate_campaign_distribution incorrectly allows Lump Sum distributions
+    // to be scheduled after campaign end. We need to ensure all Lump Sum distributions
+    // have their start_time <= campaign end_time
+    for distribution in &campaign_params.distribution_type {
+        if let DistributionType::LumpSum { start_time, .. } = distribution {
+            if *start_time > campaign_params.end_time {
+                return Err(ContractError::InvalidInput {
+                    reason: format!(
+                        "Lump Sum distribution start time ({}) cannot be after campaign end time ({})",
+                        start_time, campaign_params.end_time
+                    ),
+                });
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -232,27 +249,25 @@ fn get_compensation_for_rounding_errors(
 
 /// Checks if all distribution types have ended
 fn distribution_types_ended(campaign: &Campaign, current_time: &Timestamp) -> bool {
-    let mut distribution_types_ended = true;
-
     for distribution_type in campaign.distribution_type.iter() {
         match distribution_type {
             DistributionType::LinearVesting { end_time, .. } => {
                 if *end_time > current_time.seconds() {
-                    distribution_types_ended = false;
+                    return false;
                 }
             }
             DistributionType::LumpSum { start_time, .. } => {
-                // if the lumpsum distribution has not started yet, it means it has not ended as
-                // by the time this function is called, the lumpsum distribution was already
-                // processed and rewards paid out
+                // Lump Sum distributions are considered "ended" once their start_time has passed
+                // since they pay out all tokens at once. However, if the start_time hasn't
+                // occurred yet, the distribution hasn't ended.
                 if *start_time > current_time.seconds() {
-                    distribution_types_ended = false;
+                    return false;
                 }
             }
         }
     }
 
-    distribution_types_ended
+    true
 }
 
 /// Validates the raw address string.

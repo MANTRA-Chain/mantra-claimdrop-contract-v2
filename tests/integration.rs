@@ -5903,3 +5903,237 @@ fn test_manage_authorized_wallets_pagination() {
         assert_eq!(response.wallets.len(), 0);
     });
 }
+
+#[test]
+fn test_lump_sum_cannot_be_scheduled_after_campaign_end() {
+    let mut suite = TestingSuite::default_with_balances(vec![coin(200_000_000, "uom")]);
+
+    let alice = &suite.senders[0].clone();
+    let current_time = suite.get_time();
+
+    suite.instantiate_claimdrop_contract(Some(alice.to_string()));
+
+    // Test: Try to create a campaign with Lump Sum distribution scheduled after campaign end
+    suite.manage_campaign(
+        alice,
+        CampaignAction::CreateCampaign {
+            params: Box::new(CampaignParams {
+                name: "Test Airdrop".to_string(),
+                description: "Testing Lump Sum validation fix".to_string(),
+                ty: "airdrop".to_string(),
+                reward_denom: "uom".to_string(),
+                total_reward: coin(100_000, "uom"),
+                distribution_type: vec![
+                    DistributionType::LumpSum {
+                        percentage: Decimal::percent(50),
+                        // Lump Sum scheduled AFTER campaign end - this should fail
+                        start_time: current_time.plus_days(10).seconds(),
+                    },
+                    DistributionType::LinearVesting {
+                        percentage: Decimal::percent(50),
+                        start_time: current_time.seconds(),
+                        end_time: current_time.plus_days(7).seconds(),
+                        cliff_duration: None,
+                    },
+                ],
+                start_time: current_time.seconds(),
+                // Campaign ends in 7 days, but Lump Sum is scheduled for day 10
+                end_time: current_time.plus_days(7).seconds(),
+            }),
+        },
+        &[], // No funds during campaign creation
+        |result: Result<AppResponse, anyhow::Error>| {
+            let err = result.unwrap_err().downcast::<ContractError>().unwrap();
+            match err {
+                ContractError::InvalidInput { reason } => {
+                    assert!(
+                        reason.contains("Lump Sum distribution start time"),
+                        "Error message should mention Lump Sum distribution validation, got: {}",
+                        reason
+                    );
+                    assert!(
+                        reason.contains("cannot be after campaign end time"),
+                        "Error message should explain the issue, got: {}",
+                        reason
+                    );
+                }
+                e => panic!(
+                    "Wrong error type, should return ContractError::InvalidInput, got: {:?}",
+                    e
+                ),
+            }
+        },
+    );
+
+    // Test: Create a valid campaign with Lump Sum distribution at campaign end time (edge case)
+    suite.manage_campaign(
+        alice,
+        CampaignAction::CreateCampaign {
+            params: Box::new(CampaignParams {
+                name: "Valid Airdrop".to_string(),
+                description: "Testing valid Lump Sum at campaign end".to_string(),
+                ty: "airdrop".to_string(),
+                reward_denom: "uom".to_string(),
+                total_reward: coin(100_000, "uom"),
+                distribution_type: vec![
+                    DistributionType::LumpSum {
+                        percentage: Decimal::percent(50),
+                        // Lump Sum scheduled exactly at campaign end - this should be valid
+                        start_time: current_time.plus_days(7).seconds(),
+                    },
+                    DistributionType::LinearVesting {
+                        percentage: Decimal::percent(50),
+                        start_time: current_time.seconds(),
+                        end_time: current_time.plus_days(7).seconds(),
+                        cliff_duration: None,
+                    },
+                ],
+                start_time: current_time.seconds(),
+                end_time: current_time.plus_days(7).seconds(),
+            }),
+        },
+        &[], // No funds during campaign creation
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap(); // Should succeed
+        },
+    );
+
+    // Verify the campaign was created successfully
+    suite.query_campaign(|result| {
+        let campaign = result.unwrap();
+        assert_eq!(campaign.name, "Valid Airdrop");
+        assert_eq!(campaign.distribution_type.len(), 2);
+    });
+}
+
+#[test]
+fn test_distribution_types_ended_with_lump_sum() {
+    let mut suite = TestingSuite::default_with_balances(vec![coin(200_000_000, "uom")]);
+
+    let alice = &suite.senders[0].clone();
+    let bob = &suite.senders[1].clone();
+    let current_time = suite.get_time();
+
+    suite.instantiate_claimdrop_contract(Some(alice.to_string()));
+
+    // Create a campaign with mixed distribution types
+    suite
+        .manage_campaign(
+            alice,
+            CampaignAction::CreateCampaign {
+                params: Box::new(CampaignParams {
+                    name: "Mixed Distribution Test".to_string(),
+                    description: "Testing distribution_types_ended fix".to_string(),
+                    ty: "airdrop".to_string(),
+                    reward_denom: "uom".to_string(),
+                    total_reward: coin(100_000, "uom"),
+                    distribution_type: vec![
+                        DistributionType::LumpSum {
+                            percentage: Decimal::percent(30),
+                            start_time: current_time.plus_days(1).seconds(),
+                        },
+                        DistributionType::LinearVesting {
+                            percentage: Decimal::percent(70),
+                            start_time: current_time.plus_days(1).seconds(),
+                            end_time: current_time.plus_days(7).seconds(),
+                            cliff_duration: None,
+                        },
+                    ],
+                    start_time: current_time.plus_days(1).seconds(),
+                    end_time: current_time.plus_days(7).seconds(),
+                }),
+            },
+            &[], // No funds during campaign creation
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        )
+        .top_up_campaign(
+            alice,
+            &coins(100_000, "uom"),
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        )
+        .add_allocations(
+            alice,
+            &vec![
+                (alice.to_string(), Uint128::new(50_000)),
+                (bob.to_string(), Uint128::new(50_000)),
+            ],
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        );
+
+    // Move to day 2 (Lump Sum should have started)
+    for _ in 0..2 {
+        suite.add_day();
+    }
+
+    // Alice claims her Lump Sum portion
+    suite.claim(
+        alice,
+        None,
+        None,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Query rewards to check claimed amounts
+    suite.query_rewards(alice, |result| {
+        let rewards = result.unwrap();
+        // Should have claimed 30% (Lump Sum) + some vesting amount
+        assert!(rewards.claimed[0].amount > Uint128::new(15_000)); // At least the Lump Sum portion
+    });
+
+    // Move to campaign end
+    for _ in 0..5 {
+        suite.add_day();
+    }
+
+    // Bob claims everything at the end
+    suite.claim(
+        bob,
+        None,
+        None,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Query rewards to verify dust compensation was calculated correctly
+    suite.query_rewards(bob, |result| {
+        let rewards = result.unwrap();
+        // Bob should have claimed exactly 50,000 (including any dust compensation)
+        assert!(
+            !rewards.claimed.is_empty(),
+            "Bob should have claimed rewards"
+        );
+        assert_eq!(rewards.claimed[0].amount, Uint128::new(50_000));
+        assert!(rewards.pending.is_empty() || rewards.pending[0].amount == Uint128::zero());
+        assert_eq!(rewards.available_to_claim.len(), 0);
+    });
+
+    // Alice claims the rest
+    suite.claim(
+        alice,
+        None,
+        None,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Alice also got exactly her allocation
+    suite.query_rewards(alice, |result| {
+        let rewards = result.unwrap();
+        assert!(
+            !rewards.claimed.is_empty(),
+            "Alice should have claimed rewards"
+        );
+        assert_eq!(rewards.claimed[0].amount, Uint128::new(50_000));
+        assert!(rewards.pending.is_empty() || rewards.pending[0].amount == Uint128::zero());
+    });
+}
