@@ -488,6 +488,17 @@ pub fn blacklist_address(
 
     let address = validate_raw_address(deps.as_ref(), &address)?;
 
+    // Prevent blacklisting the owner
+    let ownership = cw_ownable::get_ownership(deps.storage)?;
+    if let Some(owner) = ownership.owner {
+        ensure!(
+            owner.to_string() != address,
+            ContractError::CampaignError {
+                reason: "Cannot blacklist the campaign owner".to_string(),
+            }
+        );
+    }
+
     if blacklist {
         BLACKLIST.save(deps.storage, address.as_str(), &true)?;
     } else {
