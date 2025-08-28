@@ -450,6 +450,40 @@
         "additionalProperties": false
       },
       {
+        "description": "Sweep non-reward tokens from the contract (owner only) This allows retrieving any tokens accidentally sent to the contract that are not the campaign's reward denom",
+        "type": "object",
+        "required": [
+          "sweep"
+        ],
+        "properties": {
+          "sweep": {
+            "type": "object",
+            "required": [
+              "denom"
+            ],
+            "properties": {
+              "amount": {
+                "description": "Optional amount to sweep. If not provided, sweeps entire balance",
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/Uint128"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "denom": {
+                "description": "The denomination of the token to sweep",
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
         "description": "Update the contract's ownership. The `action` to be provided can be either to propose transferring ownership to an account, accept a pending ownership transfer, or renounce the ownership permanently.",
         "type": "object",
         "required": [

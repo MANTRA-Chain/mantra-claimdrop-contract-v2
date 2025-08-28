@@ -99,6 +99,10 @@ pub fn execute(
                 )?,
             )
         }
+        ExecuteMsg::Sweep { denom, amount } => {
+            cw_utils::nonpayable(&info)?;
+            commands::sweep(deps, env, info, denom, amount)
+        }
     }
 }
 

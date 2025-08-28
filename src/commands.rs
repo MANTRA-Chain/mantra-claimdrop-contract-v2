@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cosmwasm_std::{ensure, BankMsg, Coin, DepsMut, Env, MessageInfo, Response, Uint128};
+use cosmwasm_std::{ensure, BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Response, Uint128};
 
 use crate::helpers::{self, validate_raw_address};
 use crate::state::{
@@ -104,6 +104,105 @@ fn close_campaign(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
             ("action", "close_campaign".to_string()),
             ("campaign", campaign.to_string()),
             ("refund", refund.to_string()),
+        ]))
+}
+
+/// Sweep recovers non-reward tokens accidentally sent to the contract.
+/// This prevents permanent loss of user funds while protecting campaign assets.
+///
+/// # Security
+/// - Owner-only operation via `cw_ownable::assert_owner`
+/// - Cannot sweep campaign reward tokens (must use CloseCampaign instead)
+/// - Validates amounts and balances before sweeping
+/// - Works whether campaign exists or not
+///
+/// # Arguments
+/// * `deps` - Dependencies for storage and querier access
+/// * `env` - Environment information including contract address
+/// * `info` - Message info containing sender (must be owner)
+/// * `denom` - The token denomination to sweep
+/// * `amount` - Optional amount to sweep (None = sweep entire balance)
+pub(crate) fn sweep(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+    denom: String,
+    amount: Option<Uint128>,
+) -> Result<Response, ContractError> {
+    // Only owner can sweep tokens
+    cw_ownable::assert_owner(deps.storage, &info.sender)?;
+
+    // Get the campaign if it exists to check reward denom
+    let campaign = CAMPAIGN.may_load(deps.storage)?;
+
+    // Prevent sweeping the reward denom if a campaign exists
+    if let Some(campaign) = campaign {
+        ensure!(
+            denom != campaign.reward_denom,
+            ContractError::CampaignError {
+                reason: format!(
+                    "Cannot sweep reward denom '{}'. Use CloseCampaign instead",
+                    campaign.reward_denom
+                )
+            }
+        );
+    }
+
+    // Query the balance of the specified denom
+    let balance = deps.querier.query_balance(&env.contract.address, &denom)?;
+
+    // Determine the amount to sweep
+    let sweep_amount = match amount {
+        Some(amt) => {
+            ensure!(
+                amt <= balance.amount,
+                ContractError::InvalidCampaignParam {
+                    param: "amount".to_string(),
+                    reason: format!(
+                        "Requested amount {} exceeds available balance {}",
+                        amt, balance.amount
+                    )
+                }
+            );
+            amt
+        }
+        None => balance.amount,
+    };
+
+    // Check if there's anything to sweep
+    ensure!(
+        !sweep_amount.is_zero(),
+        ContractError::CampaignError {
+            reason: format!("No {denom} tokens to sweep")
+        }
+    );
+
+    // Get the owner address
+    let owner = cw_ownable::get_ownership(deps.storage)?.owner.unwrap();
+
+    // Create the bank send message
+    let send_msg = BankMsg::Send {
+        to_address: owner.to_string(),
+        amount: vec![Coin {
+            denom: denom.clone(),
+            amount: sweep_amount,
+        }],
+    };
+
+    // Create a custom event for better indexing
+    let sweep_event = Event::new("sweep_tokens")
+        .add_attribute("denom", &denom)
+        .add_attribute("amount", sweep_amount.to_string())
+        .add_attribute("recipient", owner.as_ref());
+
+    Ok(Response::new()
+        .add_message(send_msg)
+        .add_event(sweep_event)
+        .add_attributes(vec![
+            ("action", "sweep"),
+            ("denom", &denom),
+            ("amount", &sweep_amount.to_string()),
+            ("recipient", owner.as_ref()),
         ]))
 }
 
