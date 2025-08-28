@@ -563,6 +563,10 @@ pub fn remove_address(
 
     ALLOCATIONS.remove(deps.storage, address.as_str());
 
+    // Also remove the blacklist entry when removing the address to maintain consistency
+    // This ensures blacklist doesn't persist for addresses that are no longer in the protocol
+    BLACKLIST.remove(deps.storage, address.as_str());
+
     Ok(Response::default()
         .add_attribute("action", "remove_address")
         .add_attribute("removed", address))

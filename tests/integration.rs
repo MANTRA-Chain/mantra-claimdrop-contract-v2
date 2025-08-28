@@ -6043,3 +6043,175 @@ fn test_distribution_types_ended_with_lump_sum() {
         assert!(rewards.pending.is_empty() || rewards.pending[0].amount == Uint128::zero());
     });
 }
+
+#[test]
+fn test_remove_address_also_removes_blacklist() {
+    let mut suite = TestingSuite::default_with_balances(vec![
+        coin(1_000_000_000, "uom"),
+        coin(1_000_000_000, "uusdc"),
+    ]);
+    let alice = &suite.senders[0].clone(); // Owner
+    let bob = &suite.senders[1].clone();
+    let carol = &suite.senders[2].clone();
+    let current_time = &suite.get_time();
+
+    // Setup: Create contract and add allocations
+    let allocations = &vec![
+        (bob.to_string(), Uint128::new(100_000)),
+        (carol.to_string(), Uint128::new(200_000)),
+    ];
+
+    suite
+        .instantiate_claimdrop_contract(None) // Alice is owner
+        .add_allocations(
+            alice,
+            allocations,
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        );
+
+    // Blacklist Carol
+    suite.blacklist_address(
+        alice,
+        carol,
+        true,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Carol is blacklisted
+    suite.query_is_blacklisted(carol, |result| {
+        let is_blacklisted = result.unwrap();
+        assert!(is_blacklisted.is_blacklisted, "Carol should be blacklisted");
+    });
+
+    // Now remove Carol's address allocation (before campaign starts)
+    suite.remove_address(
+        alice,
+        carol,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Carol's allocation is removed
+    suite.query_allocations(Some(carol), None, None, |result| {
+        let allocation = result.unwrap();
+        assert!(
+            allocation.allocations.is_empty(),
+            "Carol's allocation should be removed"
+        );
+    });
+
+    // Verify Carol is no longer blacklisted (the fix)
+    suite.query_is_blacklisted(carol, |result| {
+        let is_blacklisted = result.unwrap();
+        assert!(
+            !is_blacklisted.is_blacklisted,
+            "Carol should not be blacklisted after address removal"
+        );
+    });
+
+    // Test edge case: Blacklist Bob, then remove Bob, then re-add Bob
+    // This verifies the blacklist doesn't persist across removals
+    suite.blacklist_address(
+        alice,
+        bob,
+        true,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Bob is blacklisted
+    suite.query_is_blacklisted(bob, |result| {
+        let is_blacklisted = result.unwrap();
+        assert!(is_blacklisted.is_blacklisted, "Bob should be blacklisted");
+    });
+
+    // Remove Bob's address
+    suite.remove_address(alice, bob, |result: Result<AppResponse, anyhow::Error>| {
+        result.unwrap();
+    });
+
+    // Verify Bob is no longer blacklisted after removal
+    suite.query_is_blacklisted(bob, |result| {
+        let is_blacklisted = result.unwrap();
+        assert!(
+            !is_blacklisted.is_blacklisted,
+            "Bob should not be blacklisted after address removal"
+        );
+    });
+
+    // Re-add Bob with a new allocation
+    let new_allocations = &vec![(bob.to_string(), Uint128::new(150_000))];
+    suite.add_allocations(
+        alice,
+        new_allocations,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Bob is still not blacklisted after re-adding
+    suite.query_is_blacklisted(bob, |result| {
+        let is_blacklisted = result.unwrap();
+        assert!(
+            !is_blacklisted.is_blacklisted,
+            "Bob should still not be blacklisted after being re-added"
+        );
+    });
+
+    // Now create the campaign with Bob's new allocation
+    suite.top_up_campaign(
+        alice,
+        &coins(150_000, "uom"),
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    suite.manage_campaign(
+        alice,
+        CampaignAction::CreateCampaign {
+            params: Box::new(CampaignParams {
+                name: "Test Blacklist Removal".to_string(),
+                description: "Test that remove_address also removes blacklist entry".to_string(),
+                ty: "airdrop".to_string(),
+                total_reward: coin(150_000, "uom"),
+                distribution_type: vec![DistributionType::LumpSum {
+                    percentage: Decimal::percent(100),
+                    start_time: current_time.seconds(), // Starts immediately
+                }],
+                start_time: current_time.seconds(),
+                end_time: current_time.plus_days(7).seconds(),
+            }),
+        },
+        &[], // No funds during campaign creation
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Bob can claim successfully (not blacklisted)
+    suite.claim(
+        bob,
+        None,
+        None,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
+
+    // Verify Bob's claim was successful
+    suite.query_rewards(bob, |result| {
+        let rewards = result.unwrap();
+        assert!(
+            !rewards.claimed.is_empty(),
+            "Bob should have claimed rewards"
+        );
+        assert_eq!(rewards.claimed[0].amount, Uint128::new(150_000));
+    });
+}
