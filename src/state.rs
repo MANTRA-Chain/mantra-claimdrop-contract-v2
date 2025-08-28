@@ -26,7 +26,7 @@ pub type DistributionSlot = usize;
 pub const ALLOCATIONS: Map<&str, Uint128> = Map::new("allocations");
 
 /// Stores blacklisted addresses. Blacklisted addresses cannot claim their allocations.
-pub const BLACKLIST: Map<&str, bool> = Map::new("blacklist");
+pub const BLACKLIST: Map<&str, ()> = Map::new("blacklist");
 
 /// Stores authorized wallet addresses that can perform admin actions.
 /// Key: address string, Value: () (presence indicates authorization)
@@ -93,12 +93,10 @@ pub fn get_allocation(deps: Deps, address: &str) -> Result<Option<Uint128>, Cont
 /// # Returns
 /// * `Result<bool, ContractError>` - Whether the address is blacklisted
 pub fn is_blacklisted(deps: Deps, address: &str) -> Result<bool, ContractError> {
-    Ok(BLACKLIST
-        .may_load(
-            deps.storage,
-            helpers::validate_raw_address(deps, address)?.as_str(),
-        )?
-        .unwrap_or(false))
+    Ok(BLACKLIST.has(
+        deps.storage,
+        helpers::validate_raw_address(deps, address)?.as_str(),
+    ))
 }
 
 /// Checks if an address is authorized (owner or authorized wallet)
@@ -119,9 +117,7 @@ pub fn is_authorized(deps: Deps, address: &Addr) -> Result<bool, ContractError> 
         return Ok(true);
     }
 
-    let is_authorized = AUTHORIZED_WALLETS
-        .may_load(deps.storage, address.as_str())?
-        .is_some();
+    let is_authorized = AUTHORIZED_WALLETS.has(deps.storage, address.as_str());
 
     Ok(is_authorized)
 }
@@ -145,9 +141,7 @@ pub fn assert_authorized(deps: Deps, sender: &Addr) -> Result<(), ContractError>
     }
 
     // If not owner, check if authorized wallet
-    let is_authorized = AUTHORIZED_WALLETS
-        .may_load(deps.storage, sender.as_str())?
-        .is_some();
+    let is_authorized = AUTHORIZED_WALLETS.has(deps.storage, sender.as_str());
 
     if is_authorized {
         return Ok(());

@@ -72,7 +72,7 @@ pub(crate) fn query_rewards(
         pending.push(pending_rewards);
     }
 
-    let (claimable_amount, _) = helpers::compute_claimable_amount(
+    let (claimable_amount, _, _) = helpers::compute_claimable_amount(
         deps,
         &campaign,
         &env.block.time,

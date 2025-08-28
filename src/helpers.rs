@@ -47,13 +47,19 @@ pub(crate) fn compute_claimable_amount(
     current_time: &Timestamp,
     address: &str,
     total_claimable_amount: Uint128,
-) -> Result<(Coin, HashMap<DistributionSlot, Claim>), ContractError> {
+) -> Result<
+    (
+        Coin,
+        HashMap<DistributionSlot, Claim>,
+        HashMap<DistributionSlot, Claim>,
+    ),
+    ContractError,
+> {
     let mut claimable_amount = Uint128::zero();
     let mut new_claims = HashMap::new();
+    let previous_claims_for_address = get_claims_for_address(deps, address.to_string())?;
 
     if campaign.has_started(current_time) {
-        let previous_claims_for_address = get_claims_for_address(deps, address.to_string())?;
-
         for (distribution_slot, distribution) in
             campaign.distribution_type.iter().enumerate().clone()
         {
@@ -101,7 +107,7 @@ pub(crate) fn compute_claimable_amount(
             campaign,
             current_time,
             total_claimable_amount,
-            previous_claims_for_address,
+            previous_claims_for_address.clone(),
             &new_claims,
         )?;
 
@@ -131,6 +137,7 @@ pub(crate) fn compute_claimable_amount(
             amount: claimable_amount,
         },
         new_claims,
+        previous_claims_for_address,
     ))
 }
 

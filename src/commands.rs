@@ -4,9 +4,8 @@ use cosmwasm_std::{ensure, BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Resp
 
 use crate::helpers::{self, validate_raw_address};
 use crate::state::{
-    assert_authorized, get_allocation, get_claims_for_address, get_total_claims_amount_for_address,
-    is_authorized, is_blacklisted, Claim, DistributionSlot, ALLOCATIONS, AUTHORIZED_WALLETS,
-    BLACKLIST, CAMPAIGN, CLAIMS,
+    assert_authorized, get_allocation, get_claims_for_address, is_authorized, is_blacklisted,
+    Claim, DistributionSlot, ALLOCATIONS, AUTHORIZED_WALLETS, BLACKLIST, CAMPAIGN, CLAIMS,
 };
 use mantra_claimdrop_std::error::ContractError;
 use mantra_claimdrop_std::msg::{Campaign, CampaignAction, CampaignParams, DistributionType};
@@ -264,13 +263,14 @@ pub(crate) fn claim(
     )?;
 
     // new_claims is HashMap<DistributionSlot, Claim=(amount, timestamp)> representing newly available amounts per slot
-    let (max_claimable_amount_coin, new_claims) = helpers::compute_claimable_amount(
-        deps.as_ref(),
-        &campaign,
-        &env.block.time,
-        receiver.as_ref(),
-        total_user_allocation,
-    )?;
+    let (max_claimable_amount_coin, new_claims, previous_claims) =
+        helpers::compute_claimable_amount(
+            deps.as_ref(),
+            &campaign,
+            &env.block.time,
+            receiver.as_ref(),
+            total_user_allocation,
+        )?;
 
     let actual_claim_amount_coin = match amount {
         Some(requested_amount) => {
@@ -313,7 +313,6 @@ pub(crate) fn claim(
         }
     );
 
-    let previous_claims = get_claims_for_address(deps.as_ref(), receiver.to_string())?;
     let mut claims_to_record: HashMap<DistributionSlot, Claim> = HashMap::new();
     let mut remaining_to_distribute = actual_claim_amount_coin.amount;
 
@@ -385,9 +384,15 @@ pub(crate) fn claim(
     CAMPAIGN.save(deps.storage, &campaign)?;
     CLAIMS.save(deps.storage, receiver.to_string(), &updated_claims)?;
 
+    // Calculate total claims from updated_claims instead of making another storage call
+    let total_claimed = updated_claims
+        .iter()
+        .fold(Uint128::zero(), |acc, (_, (amount, _))| {
+            acc.checked_add(*amount).unwrap()
+        });
+
     ensure!(
-        total_user_allocation
-            >= get_total_claims_amount_for_address(deps.as_ref(), receiver.as_ref())?,
+        total_user_allocation >= total_claimed,
         ContractError::ExceededMaxClaimAmount
     );
 
@@ -447,10 +452,8 @@ pub fn add_allocations(
     for (address_raw, amount) in allocations.into_iter() {
         let validated_receiver_string = validate_raw_address(deps.as_ref(), &address_raw)?;
 
-        let allocation: Option<Uint128> =
-            ALLOCATIONS.may_load(deps.storage, validated_receiver_string.as_str())?;
         ensure!(
-            allocation.is_none(),
+            !ALLOCATIONS.has(deps.storage, validated_receiver_string.as_str()),
             ContractError::AllocationAlreadyExists {
                 address: validated_receiver_string.clone(),
             }
@@ -493,9 +496,7 @@ pub fn replace_address(
 
     // Ensure the new address doesn't have an allocation already
     ensure!(
-        ALLOCATIONS
-            .may_load(deps.storage, new_address_validated.as_str())?
-            .is_none(),
+        !ALLOCATIONS.has(deps.storage, new_address_validated.as_str()),
         ContractError::AllocationAlreadyExists {
             address: new_address_raw.clone()
         }
@@ -516,7 +517,7 @@ pub fn replace_address(
 
     if is_blacklisted(deps.as_ref(), old_address_canonical.as_str())? {
         BLACKLIST.remove(deps.storage, old_address_canonical.as_str());
-        BLACKLIST.save(deps.storage, new_address_validated.as_str(), &true)?;
+        BLACKLIST.save(deps.storage, new_address_validated.as_str(), &())?;
     }
 
     Ok(Response::default().add_attributes(vec![
@@ -599,7 +600,7 @@ pub fn blacklist_address(
     }
 
     if blacklist {
-        BLACKLIST.save(deps.storage, address.as_str(), &true)?;
+        BLACKLIST.save(deps.storage, address.as_str(), &())?;
     } else {
         BLACKLIST.remove(deps.storage, address.as_str());
     }
