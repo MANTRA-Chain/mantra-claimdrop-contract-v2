@@ -38,7 +38,6 @@ fn create_multiple_campaigns_fails() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -60,7 +59,6 @@ fn create_multiple_campaigns_fails() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -101,7 +99,6 @@ fn create_multiple_campaigns_fails() {
                     name: "Test Airdrop II".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -144,7 +141,6 @@ fn cant_create_campaign_if_not_owner() {
                     name: "".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -188,7 +184,6 @@ fn validate_campaign_params() {
                     name: "".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -216,7 +211,6 @@ fn validate_campaign_params() {
                 name: "a".repeat(201),
                 description: "This is an airdrop, 土金, ك".to_string(),
                 ty: "airdrop".to_string(),
-                reward_denom: "uom".to_string(),
                 total_reward: coin(100_000, "uom"),
                 distribution_type: vec![DistributionType::LumpSum {
                     percentage: Decimal::one(),
@@ -245,7 +239,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -274,7 +267,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "a".repeat(2001),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -304,7 +296,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -334,7 +325,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "a".repeat(201),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -364,7 +354,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -393,7 +382,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -423,7 +411,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![],
                     start_time: current_time.seconds() + 1,
@@ -448,7 +435,6 @@ fn validate_campaign_params() {
                 name: "Test Airdrop I".to_string(),
                 description: "This is an airdrop, 土金, ك".to_string(),
                 ty: "airdrop".to_string(),
-                reward_denom: "uom".to_string(),
                 total_reward: coin(100_000, "uom"),
                 distribution_type: vec![
                     DistributionType::LumpSum {
@@ -487,7 +473,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::from_str("2").unwrap(),
@@ -516,7 +501,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::from_str("0.2").unwrap(),
@@ -545,7 +529,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::zero(),
@@ -571,7 +554,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -597,7 +579,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -624,7 +605,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -658,7 +638,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::one(),
@@ -690,7 +669,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::one(),
@@ -715,7 +693,6 @@ fn validate_campaign_params() {
                 }
             },
         )
-        // rewards
         .manage_campaign(
             alice,
             CampaignAction::CreateCampaign {
@@ -723,36 +700,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop II".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uosmo".to_string(),
-                    total_reward: coin(100_000, "uom"),
-                    distribution_type: vec![DistributionType::LumpSum {
-                        percentage: Decimal::one(),
-                        start_time: current_time.seconds() + 1,
-                    }],
-                    start_time: current_time.seconds() + 1,
-                    end_time: current_time.seconds() + 172_800,
-                }),
-            },
-            &[], // No funds during campaign creation
-            |result: Result<AppResponse, anyhow::Error>| {
-                let err = result.unwrap_err().downcast::<ContractError>().unwrap();
-                match err {
-                    ContractError::InvalidCampaignParam { reason, param } => {
-                        assert_eq!(param, "reward_denom");
-                        assert_eq!(reason, "reward denom mismatch");
-                    }
-                    _ => panic!("Wrong error type, should return ContractError::InvalidCampaignParam"),
-                };
-            },
-        )
-        .manage_campaign(
-            alice,
-            CampaignAction::CreateCampaign {
-                params: Box::new(CampaignParams {
-                    name: "Test Airdrop II".to_string(),
-                    description: "This is an airdrop, 土金, ك".to_string(),
-                    ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(0, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -781,7 +728,6 @@ fn validate_campaign_params() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -820,7 +766,6 @@ fn cannot_start_distribution_in_past() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -907,7 +852,6 @@ fn create_campaign_and_claim_single_distribution_type() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -1055,7 +999,6 @@ fn cant_claim_unfunded_campaign() {
                 name: "Test Airdrop I".to_string(),
                 description: "This is an airdrop, 土金, ك".to_string(),
                 ty: "airdrop".to_string(),
-                reward_denom: "uom".to_string(),
                 total_reward: coin(100_000, "uom"),
                 distribution_type: vec![DistributionType::LumpSum {
                     percentage: Decimal::one(),
@@ -1149,7 +1092,6 @@ fn claim_ended_campaign() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -1334,7 +1276,6 @@ fn query_claimed() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -1605,7 +1546,6 @@ fn create_campaign_and_claim_multiple_distribution_types() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -1832,7 +1772,6 @@ fn claim_campaign_with_cliff() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -2004,7 +1943,6 @@ fn claim_campaign_with_vesting_cliff_and_lump_sum() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LinearVesting {
@@ -2192,7 +2130,6 @@ fn claim_campaign_with_vesting_cliff_in_future_and_lump_sum() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LinearVesting {
@@ -2417,7 +2354,6 @@ fn topup_campaigns_with_and_without_cliff() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -2545,7 +2481,6 @@ fn topup_campaigns_with_and_without_cliff() {
                     name: "Test Airdrop II".to_string(),
                     description: "This is an airdrop without cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Total intended for this campaign
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -2614,7 +2549,6 @@ fn query_rewards() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -2708,7 +2642,6 @@ fn query_rewards_single_user() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Contract has 100k, user allocated 100
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),
@@ -2786,7 +2719,6 @@ fn query_rewards_fails_when_campaign_has_not_started() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -2868,7 +2800,6 @@ fn close_campaigns() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -2967,7 +2898,6 @@ fn close_campaigns() {
                     name: "Test Airdrop I".to_string(), // Name can be same as closed one
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -3085,7 +3015,6 @@ fn can_query_claims_after_campaign_is_closed() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Contract funded with 100k
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -3242,7 +3171,6 @@ fn renouncing_contract_owner_makes_prevents_creating_campaigns() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -3343,7 +3271,6 @@ fn renouncing_contract_owner_makes_prevents_creating_campaigns() {
                     name: "Test Airdrop II".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![ /* ... */ ],
                     start_time: current_time.seconds(),
@@ -3395,7 +3322,6 @@ fn can_claim_dust_without_new_claims() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(23, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -3490,7 +3416,6 @@ fn cant_end_distribution_type_after_campaign() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -3521,7 +3446,6 @@ fn cant_end_distribution_type_after_campaign() {
                     name: "Test Airdrop II".to_string(), // Changed name
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -3550,7 +3474,6 @@ fn cant_end_distribution_type_after_campaign() {
                     name: "Test Airdrop III".to_string(), // Changed name
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -3612,7 +3535,6 @@ fn test_add_allocations() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(600_000, "uom"), // Sum of allocations
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -3977,7 +3899,6 @@ fn test_cannot_add_allocations_after_campaign_start() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),
@@ -4067,7 +3988,6 @@ fn test_replace_address() {
                     name: "Test Airdrop I".to_string(),
                     description: "Test replace address".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Matches Bob's allocation
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),               // All at once
@@ -4162,7 +4082,6 @@ fn test_replace_address() {
                     name: "Test Airdrop II".to_string(),
                     description: "Test replace address with claims".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -4307,7 +4226,6 @@ fn test_remove_address() {
                     name: "Test Airdrop I".to_string(),
                     description: "Test replace address".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Matches Bob's allocation
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),               // All at once
@@ -4456,7 +4374,6 @@ fn test_replace_placeholder_address() {
                     name: "Test Airdrop I".to_string(),
                     description: "Test replace address".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Matches Bob's allocation
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),               // All at once
@@ -4586,7 +4503,6 @@ fn test_cant_replace_address_with_existing_allocation() {
                     name: "Test Airdrop I".to_string(),
                     description: "Test replace address".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"), // Matches Bob's allocation
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),               // All at once
@@ -4675,7 +4591,6 @@ fn test_blacklist_address() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(600_000, "uom"), // Sum of allocations
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),
@@ -4814,7 +4729,6 @@ fn test_claim_more_than_currently_available_fails() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -4893,7 +4807,6 @@ fn test_partial_claim_lump_sum() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -5045,7 +4958,6 @@ fn test_partial_claim_lumpsum_and_linear_vesting() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: reward_denom.to_string(),
                     total_reward: coin(100_000, reward_denom),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -5272,7 +5184,6 @@ fn test_claim_zero_amount_fails() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: reward_denom.to_string(),
                     total_reward: coin(100_000, reward_denom),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -5349,7 +5260,6 @@ fn test_claim_full_amount_when_none_specified_after_partial_claims() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: reward_denom.to_string(),
                     total_reward: coin(100_000, reward_denom),
                     distribution_type: vec![
                         DistributionType::LumpSum {
@@ -5553,7 +5463,6 @@ fn test_claim_authorization() {
                     name: "Test Authorization".to_string(),
                     description: "Testing claim authorization".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -5921,7 +5830,6 @@ fn test_lump_sum_cannot_be_scheduled_after_campaign_end() {
                 name: "Test Airdrop".to_string(),
                 description: "Testing Lump Sum validation fix".to_string(),
                 ty: "airdrop".to_string(),
-                reward_denom: "uom".to_string(),
                 total_reward: coin(100_000, "uom"),
                 distribution_type: vec![
                     DistributionType::LumpSum {
@@ -5973,7 +5881,6 @@ fn test_lump_sum_cannot_be_scheduled_after_campaign_end() {
                 name: "Valid Airdrop".to_string(),
                 description: "Testing valid Lump Sum at campaign end".to_string(),
                 ty: "airdrop".to_string(),
-                reward_denom: "uom".to_string(),
                 total_reward: coin(100_000, "uom"),
                 distribution_type: vec![
                     DistributionType::LumpSum {
@@ -6025,7 +5932,6 @@ fn test_distribution_types_ended_with_lump_sum() {
                     name: "Mixed Distribution Test".to_string(),
                     description: "Testing distribution_types_ended fix".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {

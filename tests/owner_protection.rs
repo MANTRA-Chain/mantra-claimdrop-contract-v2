@@ -24,7 +24,6 @@ fn test_cannot_blacklist_owner() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(10_000_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -131,7 +130,6 @@ fn test_owner_can_have_allocations_but_cannot_be_blacklisted() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(10_000_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -244,7 +242,6 @@ fn test_owner_protection_ensures_owner_can_claim() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(10_000_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -358,7 +355,6 @@ fn test_owner_protection_with_multiple_authorized_wallets() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(10_000_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),

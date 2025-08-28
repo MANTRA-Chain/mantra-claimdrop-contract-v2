@@ -34,7 +34,6 @@ fn can_claim_dust_after_vesting_ends() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(23, "uom"),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -148,7 +147,6 @@ fn can_claim_dust_after_vesting_ends_2() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop, 土金, ك".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(23, "uom"),
                     distribution_type: vec![
                         DistributionType::LumpSum {

@@ -133,7 +133,7 @@ pub(crate) fn compute_claimable_amount(
 
     Ok((
         Coin {
-            denom: campaign.reward_denom.clone(),
+            denom: campaign.total_reward.denom.clone(),
             amount: claimable_amount,
         },
         new_claims,

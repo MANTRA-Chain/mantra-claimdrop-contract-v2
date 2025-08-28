@@ -80,7 +80,7 @@ fn close_campaign(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
 
     let refund: Coin = deps
         .querier
-        .query_balance(env.contract.address, &campaign.reward_denom)?;
+        .query_balance(env.contract.address, &campaign.total_reward.denom)?;
 
     let mut messages = vec![];
 
@@ -137,11 +137,11 @@ pub(crate) fn sweep(
     // Prevent sweeping the reward denom if a campaign exists
     if let Some(campaign) = campaign {
         ensure!(
-            denom != campaign.reward_denom,
+            denom != campaign.total_reward.denom,
             ContractError::CampaignError {
                 reason: format!(
                     "Cannot sweep reward denom '{}'. Use CloseCampaign instead",
-                    campaign.reward_denom
+                    campaign.total_reward.denom
                 )
             }
         );
@@ -290,7 +290,7 @@ pub(crate) fn claim(
                 }
             );
             Coin {
-                denom: campaign.reward_denom.clone(),
+                denom: campaign.total_reward.denom.clone(),
                 amount: requested_amount,
             }
         }
@@ -304,7 +304,7 @@ pub(crate) fn claim(
 
     let available_funds = deps
         .querier
-        .query_balance(env.contract.address, &campaign.reward_denom)?;
+        .query_balance(env.contract.address, &campaign.total_reward.denom)?;
 
     ensure!(
         actual_claim_amount_coin.amount <= available_funds.amount,
