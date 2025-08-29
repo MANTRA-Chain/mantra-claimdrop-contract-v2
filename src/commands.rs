@@ -320,36 +320,37 @@ pub(crate) fn claim(
     let mut lump_sum_slots_with_new_claims: Vec<DistributionSlot> = vec![];
     let mut linear_vesting_slots_with_new_claims: Vec<DistributionSlot> = vec![];
 
-        for (idx, dist_type) in campaign.distribution_type.iter().enumerate() {
-            if new_claims.contains_key(&idx) {
-                // Only consider slots that have new claimable amounts
-                match dist_type {
-                    DistributionType::LumpSum { .. } => lump_sum_slots_with_new_claims.push(idx),
-                    DistributionType::LinearVesting { .. } => {
-                        linear_vesting_slots_with_new_claims.push(idx)
-                    }
+    for (idx, dist_type) in campaign.distribution_type.iter().enumerate() {
+        if new_claims.contains_key(&idx) {
+            // Only consider slots that have new claimable amounts
+            match dist_type {
+                DistributionType::LumpSum { .. } => lump_sum_slots_with_new_claims.push(idx),
+                DistributionType::LinearVesting { .. } => {
+                    linear_vesting_slots_with_new_claims.push(idx)
                 }
             }
         }
+    }
 
-        lump_sum_slots_with_new_claims.sort();
-        linear_vesting_slots_with_new_claims.sort();
+    lump_sum_slots_with_new_claims.sort();
+    linear_vesting_slots_with_new_claims.sort();
 
-        // Phase 1: Distribute to LumpSum slots from new_claims
-        for slot_idx in lump_sum_slots_with_new_claims {
-            if remaining_to_distribute == Uint128::zero() {
-                break;
-            }
-            // new_claims.get(&slot_idx) is guaranteed to return Some since slot_idx comes from slots with new claims
-            let (available_from_slot, _) = new_claims.get(&slot_idx).expect("slot_idx must exist in new_claims");
-            let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
-            if take_from_slot > Uint128::zero() {
-                claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
-
-                remaining_to_distribute =
-                    remaining_to_distribute.saturating_sub(take_from_slot);
-            }
+    // Phase 1: Distribute to LumpSum slots from new_claims
+    for slot_idx in lump_sum_slots_with_new_claims {
+        if remaining_to_distribute == Uint128::zero() {
+            break;
         }
+        // new_claims.get(&slot_idx) is guaranteed to return Some since slot_idx comes from slots with new claims
+        let (available_from_slot, _) = new_claims
+            .get(&slot_idx)
+            .expect("slot_idx must exist in new_claims");
+        let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
+        if take_from_slot > Uint128::zero() {
+            claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+
+            remaining_to_distribute = remaining_to_distribute.saturating_sub(take_from_slot);
+        }
+    }
 
     // Phase 2: Distribute remaining to LinearVesting slots from new_claims
     if remaining_to_distribute > Uint128::zero() {
@@ -358,20 +359,27 @@ pub(crate) fn claim(
                 break;
             }
             // new_claims.get(&slot_idx) is guaranteed to return Some since slot_idx comes from slots with new claims
-            let (available_from_slot, _) = new_claims.get(&slot_idx).expect("slot_idx must exist in new_claims");
-            let take_from_slot =
-                std::cmp::min(remaining_to_distribute, *available_from_slot);
+            let (available_from_slot, _) = new_claims
+                .get(&slot_idx)
+                .expect("slot_idx must exist in new_claims");
+            let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
             if take_from_slot > Uint128::zero() {
-                claims_to_record
-                    .insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+                claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
 
-                remaining_to_distribute =
-                    remaining_to_distribute.saturating_sub(take_from_slot);
+                remaining_to_distribute = remaining_to_distribute.saturating_sub(take_from_slot);
             }
         }
     }
-    // At this point, if initial checks were correct (actual_claim_amount_coin.amount <= sum of new_claims),
-    // remaining_to_distribute should be zero.
+
+    // Enforce the invariant that all requested tokens have been distributed
+    ensure!(
+        remaining_to_distribute == Uint128::zero(),
+        ContractError::CampaignError {
+            reason: format!(
+                "Distribution error: {remaining_to_distribute} tokens remain undistributed. This indicates a bug in the claimable amount calculation."
+            )
+        }
+    );
 
     let updated_claims = helpers::aggregate_claims(&previous_claims, &claims_to_record)?;
 
