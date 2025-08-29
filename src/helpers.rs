@@ -264,11 +264,16 @@ fn get_compensation_for_rounding_errors(
     if distribution_types_ended(campaign, current_time) {
         let updated_claims = aggregate_claims(&previous_claims_for_address, new_claims)?;
 
-        let total_claimed = updated_claims
-            .iter()
-            .fold(Uint128::zero(), |acc, (_, (amount, _))| {
-                acc.checked_add(*amount).unwrap()
-            });
+        let total_claimed =
+            updated_claims
+                .iter()
+                .try_fold(Uint128::zero(), |acc, (_, (amount, _))| {
+                    acc.checked_add(*amount)
+                        .map_err(|_| ContractError::InvalidInput {
+                            reason: "arithmetic overflow calculating total claimed amount"
+                                .to_string(),
+                        })
+                })?;
 
         // get user dust to claim
         let (slot, _) = new_claims

@@ -131,22 +131,10 @@ pub fn is_authorized(deps: Deps, address: &Addr) -> Result<bool, ContractError> 
 /// # Returns
 /// * `Result<(), ContractError>` - Success or appropriate error
 pub fn assert_authorized(deps: Deps, sender: &Addr) -> Result<(), ContractError> {
-    // First check if sender is owner to maintain backward compatibility with error types
-    if let Ok(ownership) = cw_ownable::get_ownership(deps.storage) {
-        if let Some(owner) = ownership.owner {
-            if owner == sender {
-                return Ok(());
-            }
-        }
+    if is_authorized(deps, sender)? {
+        Ok(())
+    } else {
+        // Return the same error type as cw_ownable::assert_owner for consistency
+        cw_ownable::assert_owner(deps.storage, sender).map_err(|e| e.into())
     }
-
-    // If not owner, check if authorized wallet
-    let is_authorized = AUTHORIZED_WALLETS.has(deps.storage, sender.as_str());
-
-    if is_authorized {
-        return Ok(());
-    }
-
-    // If neither owner nor authorized, return the same error type as cw_ownable::assert_owner
-    cw_ownable::assert_owner(deps.storage, sender).map_err(|e| e.into())
 }
