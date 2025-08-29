@@ -542,7 +542,7 @@ fn test_empty_address_list_fails() {
     assert!(result.is_err());
     match result.unwrap_err() {
         ContractError::InvalidInput { .. } => {}
-        err => panic!("Expected ContractError::InvalidInput, got: {:?}", err),
+        err => panic!("Expected ContractError::InvalidInput, got: {err:?}"),
     }
 }
 
@@ -563,7 +563,7 @@ fn test_batch_size_limit() {
 
     // Create a batch that exceeds the limit (1000)
     let large_batch: Vec<String> = (0..1001)
-        .map(|i| deps.api.addr_make(&format!("addr{:04}", i)).to_string())
+        .map(|i| deps.api.addr_make(&format!("addr{i:04}")).to_string())
         .collect();
 
     let result = manage_authorized_wallets(deps.as_mut(), owner_info, large_batch, true);
@@ -575,10 +575,7 @@ fn test_batch_size_limit() {
             assert_eq!(actual, 1001);
             assert_eq!(max, 1000);
         }
-        err => panic!(
-            "Expected ContractError::BatchSizeLimitExceeded, got: {:?}",
-            err
-        ),
+        err => panic!("Expected ContractError::BatchSizeLimitExceeded, got: {err:?}"),
     }
 }
 
@@ -599,7 +596,7 @@ fn test_authorized_wallets_pagination() {
 
     // Authorize 5 wallets
     let addresses: Vec<String> = (1..=5)
-        .map(|i| deps.api.addr_make(&format!("addr{:03}", i)).to_string())
+        .map(|i| deps.api.addr_make(&format!("addr{i:03}")).to_string())
         .collect();
 
     manage_authorized_wallets(deps.as_mut(), owner_info, addresses.clone(), true).unwrap();
@@ -649,7 +646,7 @@ fn test_authorized_wallets_pagination_large_limit() {
 
     // Authorize 10 wallets
     let addresses: Vec<String> = (1..=10)
-        .map(|i| deps.api.addr_make(&format!("addr{:03}", i)).to_string())
+        .map(|i| deps.api.addr_make(&format!("addr{i:03}")).to_string())
         .collect();
 
     manage_authorized_wallets(deps.as_mut(), owner_info, addresses, true).unwrap();

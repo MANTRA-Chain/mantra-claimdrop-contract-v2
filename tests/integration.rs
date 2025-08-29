@@ -1609,7 +1609,7 @@ fn create_campaign_and_claim_multiple_distribution_types() {
             |result: Result<AppResponse, anyhow::Error>| {
                 let err = result.unwrap_err().downcast::<ContractError>().unwrap();
                 match err {
-                    ContractError::NothingToClaim { .. } => {}
+                    ContractError::NothingToClaim => {}
                     _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
                 }
             },
@@ -1631,7 +1631,7 @@ fn create_campaign_and_claim_multiple_distribution_types() {
             |result: Result<AppResponse, anyhow::Error>| {
                 let err = result.unwrap_err().downcast::<ContractError>().unwrap();
                 match err {
-                    ContractError::NothingToClaim { .. } => {}
+                    ContractError::NothingToClaim => {}
                     _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
                 }
             },
@@ -1700,7 +1700,7 @@ fn create_campaign_and_claim_multiple_distribution_types() {
             |result: Result<AppResponse, anyhow::Error>| {
                 let err = result.unwrap_err().downcast::<ContractError>().unwrap();
                 match err {
-                    ContractError::NothingToClaim { .. } => {}
+                    ContractError::NothingToClaim => {}
                     _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
                 }
             },
@@ -1804,7 +1804,7 @@ fn claim_campaign_with_cliff() {
         |result: Result<AppResponse, anyhow::Error>| {
             let err = result.unwrap_err().downcast::<ContractError>().unwrap();
             match err {
-                ContractError::NothingToClaim { .. } => {}
+                ContractError::NothingToClaim => {}
                 _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
             }
         },
@@ -1824,7 +1824,7 @@ fn claim_campaign_with_cliff() {
         |result: Result<AppResponse, anyhow::Error>| {
             let err = result.unwrap_err().downcast::<ContractError>().unwrap();
             match err {
-                ContractError::NothingToClaim { .. } => {}
+                ContractError::NothingToClaim => {}
                 _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
             }
         },
@@ -2006,7 +2006,7 @@ fn claim_campaign_with_vesting_cliff_and_lump_sum() {
         |result: Result<AppResponse, anyhow::Error>| {
             let err = result.unwrap_err().downcast::<ContractError>().unwrap();
             match err {
-                ContractError::NothingToClaim { .. } => {}
+                ContractError::NothingToClaim => {}
                 _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
             }
         },
@@ -2193,7 +2193,7 @@ fn claim_campaign_with_vesting_cliff_in_future_and_lump_sum() {
         |result: Result<AppResponse, anyhow::Error>| {
             let err = result.unwrap_err().downcast::<ContractError>().unwrap();
             match err {
-                ContractError::NothingToClaim { .. } => {}
+                ContractError::NothingToClaim => {}
                 _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
             }
         },
@@ -2209,7 +2209,7 @@ fn claim_campaign_with_vesting_cliff_in_future_and_lump_sum() {
         |result: Result<AppResponse, anyhow::Error>| {
             let err = result.unwrap_err().downcast::<ContractError>().unwrap();
             match err {
-                ContractError::NothingToClaim { .. } => {}
+                ContractError::NothingToClaim => {}
                 _ => panic!("Wrong error type, should return ContractError::NothingToClaim"),
             }
         },
@@ -2671,7 +2671,7 @@ fn query_rewards_single_user() {
             assert_eq!(rewards_response.claimed, vec![]);
             assert_eq!(rewards_response.pending, coins(100, "uom"));
             assert_eq!(rewards_response.available_to_claim, coins(100, "uom"));
-            println!("{:?}", rewards_response);
+            println!("{rewards_response:?}");
         })
         .claim(
             alice,
@@ -2687,7 +2687,7 @@ fn query_rewards_single_user() {
             assert_eq!(rewards_response.claimed, coins(100, "uom"));
             assert_eq!(rewards_response.pending, vec![]);
             assert_eq!(rewards_response.available_to_claim, vec![]);
-            println!("{:?}", rewards_response);
+            println!("{rewards_response:?}");
         });
 }
 
@@ -3255,8 +3255,7 @@ fn renouncing_contract_owner_makes_prevents_creating_campaigns() {
                     ContractError::OwnershipError(e) => match e {
                         OwnershipError::NoOwner => {} // Correct: No owner to perform this action
                         _ => panic!(
-                            "Wrong error type, should return OwnershipError::NoOwner but got {:?}",
-                            e
+                            "Wrong error type, should return OwnershipError::NoOwner but got {e:?}"
                         ),
                     },
                     _ => panic!("Wrong error type, should return ContractError::OwnershipError"),
@@ -3284,8 +3283,7 @@ fn renouncing_contract_owner_makes_prevents_creating_campaigns() {
                     ContractError::OwnershipError(e) => match e {
                         OwnershipError::NoOwner => {}
                         _ => panic!(
-                            "Wrong error type, should return OwnershipError::NoOwner but got {:?}",
-                            e
+                            "Wrong error type, should return OwnershipError::NoOwner but got {e:?}"
                         ),
                     },
                     _ => panic!("Wrong error type, should return ContractError::OwnershipError"),
@@ -3748,8 +3746,7 @@ fn cant_add_allocations_with_invalid_placeholders() {
                     assert_eq!(
                         reason,
                         format!(
-                            "placeholder address '{}' contains control characters",
-                            invalid_chars
+                            "placeholder address '{invalid_chars}' contains control characters"
                         )
                         .to_string()
                     );
@@ -3802,7 +3799,7 @@ fn test_allocation_batch_size_limit() {
     // Create a batch that exceeds the limit
     let mut large_batch = Vec::new();
     for i in 0..=MAX_ALLOCATION_BATCH_SIZE {
-        large_batch.push((format!("address{}", i), Uint128::new(100)));
+        large_batch.push((format!("address{i}"), Uint128::new(100)));
     }
 
     suite.add_allocations(
@@ -3825,7 +3822,7 @@ fn test_allocation_batch_size_limit() {
     // Test that exactly 3000 allocations work fine
     let mut max_batch = Vec::new();
     for i in 0..MAX_ALLOCATION_BATCH_SIZE {
-        max_batch.push((format!("addr{}", i), Uint128::new(100)));
+        max_batch.push((format!("addr{i}"), Uint128::new(100)));
     }
 
     suite.add_allocations(
@@ -4632,7 +4629,7 @@ fn test_blacklist_address() {
         )
         .query_is_blacklisted(carol, |result| {
             let blacklist_status = result.unwrap();
-            assert_eq!(blacklist_status.is_blacklisted, false);
+            assert!(!blacklist_status.is_blacklisted);
         })
         .blacklist_address(
             // Owner succeeds
@@ -4653,11 +4650,11 @@ fn test_blacklist_address() {
         )
         .query_is_blacklisted(carol, |result| {
             let blacklist_status = result.unwrap();
-            assert_eq!(blacklist_status.is_blacklisted, true);
+            assert!(blacklist_status.is_blacklisted);
         })
         .query_is_blacklisted(placeholder, |result| {
             let blacklist_status = result.unwrap();
-            assert_eq!(blacklist_status.is_blacklisted, true);
+            assert!(blacklist_status.is_blacklisted);
         });
 
     suite.add_day(); // Advance 1 day, campaign starts
@@ -4760,7 +4757,7 @@ fn test_claim_more_than_currently_available_fails() {
 
     // At this point, only lump_sum_share is available. Vesting hasn't started/cliffed.
     suite.claim(
-        &alice,
+        alice,
         None,
         Some(excessive_amount),
         |result: Result<AppResponse, anyhow::Error>| {
@@ -5856,18 +5853,15 @@ fn test_lump_sum_cannot_be_scheduled_after_campaign_end() {
                 ContractError::InvalidInput { reason } => {
                     assert!(
                         reason.contains("Lump Sum distribution start time"),
-                        "Error message should mention Lump Sum distribution validation, got: {}",
-                        reason
+                        "Error message should mention Lump Sum distribution validation, got: {reason}"
                     );
                     assert!(
                         reason.contains("cannot be after campaign end time"),
-                        "Error message should explain the issue, got: {}",
-                        reason
+                        "Error message should explain the issue, got: {reason}"
                     );
                 }
                 e => panic!(
-                    "Wrong error type, should return ContractError::InvalidInput, got: {:?}",
-                    e
+                    "Wrong error type, should return ContractError::InvalidInput, got: {e:?}"
                 ),
             }
         },

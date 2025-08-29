@@ -346,6 +346,7 @@ pub(crate) fn claim(
                 let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
                 if take_from_slot > Uint128::zero() {
                     claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+
                     remaining_to_distribute =
                         remaining_to_distribute.saturating_sub(take_from_slot);
                 }
@@ -364,6 +365,7 @@ pub(crate) fn claim(
                     if take_from_slot > Uint128::zero() {
                         claims_to_record
                             .insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+
                         remaining_to_distribute =
                             remaining_to_distribute.saturating_sub(take_from_slot);
                     }
