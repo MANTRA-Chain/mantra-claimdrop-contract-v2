@@ -316,9 +316,9 @@ pub(crate) fn claim(
     let mut claims_to_record: HashMap<DistributionSlot, Claim> = HashMap::new();
     let mut remaining_to_distribute = actual_claim_amount_coin.amount;
 
-    if remaining_to_distribute > Uint128::zero() {
-        let mut lump_sum_slots_with_new_claims: Vec<DistributionSlot> = vec![];
-        let mut linear_vesting_slots_with_new_claims: Vec<DistributionSlot> = vec![];
+    // remaining_to_distribute is guaranteed to be > 0 from earlier validation
+    let mut lump_sum_slots_with_new_claims: Vec<DistributionSlot> = vec![];
+    let mut linear_vesting_slots_with_new_claims: Vec<DistributionSlot> = vec![];
 
         for (idx, dist_type) in campaign.distribution_type.iter().enumerate() {
             if new_claims.contains_key(&idx) {
@@ -340,36 +340,33 @@ pub(crate) fn claim(
             if remaining_to_distribute == Uint128::zero() {
                 break;
             }
-            // new_claims.get(&slot_idx) returns Option<&(Uint128, u64)>
-            // The Uint128 is the amount newly available from this slot.
-            if let Some((available_from_slot, _)) = new_claims.get(&slot_idx) {
-                let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
-                if take_from_slot > Uint128::zero() {
-                    claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+            // new_claims.get(&slot_idx) is guaranteed to return Some since slot_idx comes from slots with new claims
+            let (available_from_slot, _) = new_claims.get(&slot_idx).expect("slot_idx must exist in new_claims");
+            let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
+            if take_from_slot > Uint128::zero() {
+                claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
 
-                    remaining_to_distribute =
-                        remaining_to_distribute.saturating_sub(take_from_slot);
-                }
+                remaining_to_distribute =
+                    remaining_to_distribute.saturating_sub(take_from_slot);
             }
         }
 
-        // Phase 2: Distribute remaining to LinearVesting slots from new_claims
-        if remaining_to_distribute > Uint128::zero() {
-            for slot_idx in linear_vesting_slots_with_new_claims {
-                if remaining_to_distribute == Uint128::zero() {
-                    break;
-                }
-                if let Some((available_from_slot, _)) = new_claims.get(&slot_idx) {
-                    let take_from_slot =
-                        std::cmp::min(remaining_to_distribute, *available_from_slot);
-                    if take_from_slot > Uint128::zero() {
-                        claims_to_record
-                            .insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+    // Phase 2: Distribute remaining to LinearVesting slots from new_claims
+    if remaining_to_distribute > Uint128::zero() {
+        for slot_idx in linear_vesting_slots_with_new_claims {
+            if remaining_to_distribute == Uint128::zero() {
+                break;
+            }
+            // new_claims.get(&slot_idx) is guaranteed to return Some since slot_idx comes from slots with new claims
+            let (available_from_slot, _) = new_claims.get(&slot_idx).expect("slot_idx must exist in new_claims");
+            let take_from_slot =
+                std::cmp::min(remaining_to_distribute, *available_from_slot);
+            if take_from_slot > Uint128::zero() {
+                claims_to_record
+                    .insert(slot_idx, (take_from_slot, env.block.time.seconds()));
 
-                        remaining_to_distribute =
-                            remaining_to_distribute.saturating_sub(take_from_slot);
-                    }
-                }
+                remaining_to_distribute =
+                    remaining_to_distribute.saturating_sub(take_from_slot);
             }
         }
     }
