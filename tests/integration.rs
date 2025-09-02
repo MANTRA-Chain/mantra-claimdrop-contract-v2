@@ -4418,33 +4418,31 @@ fn test_replace_placeholder_address() {
             let allocation = result.unwrap();
             assert!(allocation.allocations[0].1 == coin(100_000, "uom"));
         })
-        // can't replace a placeholder with another placeholder
+        // can now replace a placeholder with another placeholder (fixed inconsistency)
         .replace_address(
             alice,
             &Addr::unchecked("vitalik.eth"),
             placeholder,
             |result: Result<AppResponse, anyhow::Error>| {
-                let err = result.unwrap_err().downcast::<ContractError>().unwrap();
-                match err {
-                    ContractError::Std(e) => {
-                        assert!(e.to_string().contains("Invalid input"));
-                    }
-                    _ => panic!("Wrong error type, should return ContractError::Std"),
-                }
+                result.unwrap(); // Should succeed now
             },
         )
         .replace_address(
             alice,
-            &Addr::unchecked("vitalik.eth"),
+            placeholder, // Now replace the placeholder with carol
             carol,
             |result: Result<AppResponse, anyhow::Error>| {
                 result.unwrap();
             },
         );
 
-    // Verify Vitalik has no allocation or claims, Carol has Vitalik's original allocation
+    // Verify Vitalik and placeholder have no allocations, Carol has the original allocation
     suite
         .query_allocations(Some(vitalik_addr), None, None, |result| {
+            let allocation = result.unwrap();
+            assert!(allocation.allocations.is_empty());
+        })
+        .query_allocations(Some(placeholder), None, None, |result| {
             let allocation = result.unwrap();
             assert!(allocation.allocations.is_empty());
         })
@@ -4465,6 +4463,89 @@ fn test_replace_placeholder_address() {
                 (carol.to_string(), coin(100_000, "uom"))
             );
         });
+}
+
+#[test]
+fn test_replace_address_with_placeholder_consistency() {
+    let mut suite = TestingSuite::default_with_balances(vec![
+        coin(1_000_000_000, "uom"),
+        coin(1_000_000_000, "uusdc"),
+    ]);
+    let alice = &suite.senders[0].clone(); // Owner
+    let bob = &suite.senders[1].clone(); // Valid cosmos address
+    let placeholder1 = &Addr::unchecked("alice.eth");
+    let placeholder2 = &Addr::unchecked("bob.eth"); 
+    let current_time = &suite.get_time();
+
+    suite.instantiate_claimdrop_contract(None); // Alice is owner
+
+    // Upload allocation for valid cosmos address
+    suite
+        .add_allocations(
+            alice,
+&vec![(bob.to_string(), Uint128::new(100_000))],
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        )
+        // Upload allocation for placeholder address
+        .add_allocations(
+            alice,
+&vec![(placeholder1.to_string(), Uint128::new(50_000))],
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        );
+
+    // Test 1: Replace valid cosmos address with placeholder (should work)
+    suite
+        .replace_address(
+            alice,
+            bob,
+            placeholder2,
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        );
+
+    // Test 2: Replace placeholder with another placeholder (should work)
+    let placeholder3 = &Addr::unchecked("charlie.eth");
+    suite
+        .replace_address(
+            alice,
+            placeholder1,
+            placeholder3,
+            |result: Result<AppResponse, anyhow::Error>| {
+                result.unwrap();
+            },
+        );
+
+    // Verify the replacements worked
+    // Bob should have no allocation
+    suite.query_allocations(Some(bob), None, None, |result| {
+        let allocation = result.unwrap();
+        assert!(allocation.allocations.is_empty());
+    });
+
+    // placeholder1 should have no allocation
+    suite.query_allocations(Some(placeholder1), None, None, |result| {
+        let allocation = result.unwrap();
+        assert!(allocation.allocations.is_empty());
+    });
+
+    // placeholder2 should have Bob's original allocation
+    suite.query_allocations(Some(placeholder2), None, None, |result| {
+        let allocation = result.unwrap();
+        assert_eq!(allocation.allocations.len(), 1);
+        assert_eq!(allocation.allocations[0].1, coin(100_000, ""));
+    });
+
+    // placeholder3 should have placeholder1's original allocation
+    suite.query_allocations(Some(placeholder3), None, None, |result| {
+        let allocation = result.unwrap();
+        assert_eq!(allocation.allocations.len(), 1);
+        assert_eq!(allocation.allocations[0].1, coin(50_000, ""));
+    });
 }
 
 #[test]

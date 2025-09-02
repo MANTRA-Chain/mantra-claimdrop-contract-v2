@@ -491,8 +491,8 @@ pub fn replace_address(
     assert_authorized(deps.as_ref(), &info.sender)?;
 
     let old_address_canonical = validate_raw_address(deps.as_ref(), &old_address_raw)?;
-    // New address should be a valid cosmos address
-    let new_address_validated = deps.api.addr_validate(&new_address_raw)?;
+    // New address should be validated the same way as when adding allocations
+    let new_address_validated = validate_raw_address(deps.as_ref(), &new_address_raw)?;
 
     let old_allocation = ALLOCATIONS
         .may_load(deps.storage, old_address_canonical.as_str())?
