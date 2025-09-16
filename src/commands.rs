@@ -4,9 +4,8 @@ use cosmwasm_std::{ensure, BankMsg, Coin, DepsMut, Env, Event, MessageInfo, Resp
 
 use crate::helpers::{self, validate_raw_address};
 use crate::state::{
-    assert_authorized, get_allocation, get_claims_for_address, get_total_claims_amount_for_address,
-    is_authorized, is_blacklisted, Claim, DistributionSlot, ALLOCATIONS, AUTHORIZED_WALLETS,
-    BLACKLIST, CAMPAIGN, CLAIMS,
+    assert_authorized, get_allocation, get_claims_for_address, is_authorized, is_blacklisted,
+    Claim, DistributionSlot, ALLOCATIONS, AUTHORIZED_WALLETS, BLACKLIST, CAMPAIGN, CLAIMS,
 };
 use mantra_claimdrop_std::error::ContractError;
 use mantra_claimdrop_std::msg::{Campaign, CampaignAction, CampaignParams, DistributionType};
@@ -81,7 +80,7 @@ fn close_campaign(deps: DepsMut, env: Env) -> Result<Response, ContractError> {
 
     let refund: Coin = deps
         .querier
-        .query_balance(env.contract.address, &campaign.reward_denom)?;
+        .query_balance(env.contract.address, &campaign.total_reward.denom)?;
 
     let mut messages = vec![];
 
@@ -138,11 +137,11 @@ pub(crate) fn sweep(
     // Prevent sweeping the reward denom if a campaign exists
     if let Some(campaign) = campaign {
         ensure!(
-            denom != campaign.reward_denom,
+            denom != campaign.total_reward.denom,
             ContractError::CampaignError {
                 reason: format!(
                     "Cannot sweep reward denom '{}'. Use CloseCampaign instead",
-                    campaign.reward_denom
+                    campaign.total_reward.denom
                 )
             }
         );
@@ -264,13 +263,14 @@ pub(crate) fn claim(
     )?;
 
     // new_claims is HashMap<DistributionSlot, Claim=(amount, timestamp)> representing newly available amounts per slot
-    let (max_claimable_amount_coin, new_claims) = helpers::compute_claimable_amount(
-        deps.as_ref(),
-        &campaign,
-        &env.block.time,
-        receiver.as_ref(),
-        total_user_allocation,
-    )?;
+    let (max_claimable_amount_coin, new_claims, previous_claims) =
+        helpers::compute_claimable_amount(
+            deps.as_ref(),
+            &campaign,
+            &env.block.time,
+            receiver.as_ref(),
+            total_user_allocation,
+        )?;
 
     let actual_claim_amount_coin = match amount {
         Some(requested_amount) => {
@@ -290,7 +290,7 @@ pub(crate) fn claim(
                 }
             );
             Coin {
-                denom: campaign.reward_denom.clone(),
+                denom: campaign.total_reward.denom.clone(),
                 amount: requested_amount,
             }
         }
@@ -304,7 +304,7 @@ pub(crate) fn claim(
 
     let available_funds = deps
         .querier
-        .query_balance(env.contract.address, &campaign.reward_denom)?;
+        .query_balance(env.contract.address, &campaign.total_reward.denom)?;
 
     ensure!(
         actual_claim_amount_coin.amount <= available_funds.amount,
@@ -313,67 +313,72 @@ pub(crate) fn claim(
         }
     );
 
-    let previous_claims = get_claims_for_address(deps.as_ref(), receiver.to_string())?;
     let mut claims_to_record: HashMap<DistributionSlot, Claim> = HashMap::new();
     let mut remaining_to_distribute = actual_claim_amount_coin.amount;
 
-    if remaining_to_distribute > Uint128::zero() {
-        let mut lump_sum_slots_with_new_claims: Vec<DistributionSlot> = vec![];
-        let mut linear_vesting_slots_with_new_claims: Vec<DistributionSlot> = vec![];
+    // remaining_to_distribute is guaranteed to be > 0 from earlier validation
+    let mut lump_sum_slots_with_new_claims: Vec<DistributionSlot> = vec![];
+    let mut linear_vesting_slots_with_new_claims: Vec<DistributionSlot> = vec![];
 
-        for (idx, dist_type) in campaign.distribution_type.iter().enumerate() {
-            if new_claims.contains_key(&idx) {
-                // Only consider slots that have new claimable amounts
-                match dist_type {
-                    DistributionType::LumpSum { .. } => lump_sum_slots_with_new_claims.push(idx),
-                    DistributionType::LinearVesting { .. } => {
-                        linear_vesting_slots_with_new_claims.push(idx)
-                    }
-                }
-            }
-        }
-
-        lump_sum_slots_with_new_claims.sort();
-        linear_vesting_slots_with_new_claims.sort();
-
-        // Phase 1: Distribute to LumpSum slots from new_claims
-        for slot_idx in lump_sum_slots_with_new_claims {
-            if remaining_to_distribute == Uint128::zero() {
-                break;
-            }
-            // new_claims.get(&slot_idx) returns Option<&(Uint128, u64)>
-            // The Uint128 is the amount newly available from this slot.
-            if let Some((available_from_slot, _)) = new_claims.get(&slot_idx) {
-                let take_from_slot = std::cmp::min(remaining_to_distribute, *available_from_slot);
-                if take_from_slot > Uint128::zero() {
-                    claims_to_record.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
-                    remaining_to_distribute =
-                        remaining_to_distribute.saturating_sub(take_from_slot);
-                }
-            }
-        }
-
-        // Phase 2: Distribute remaining to LinearVesting slots from new_claims
-        if remaining_to_distribute > Uint128::zero() {
-            for slot_idx in linear_vesting_slots_with_new_claims {
-                if remaining_to_distribute == Uint128::zero() {
-                    break;
-                }
-                if let Some((available_from_slot, _)) = new_claims.get(&slot_idx) {
-                    let take_from_slot =
-                        std::cmp::min(remaining_to_distribute, *available_from_slot);
-                    if take_from_slot > Uint128::zero() {
-                        claims_to_record
-                            .insert(slot_idx, (take_from_slot, env.block.time.seconds()));
-                        remaining_to_distribute =
-                            remaining_to_distribute.saturating_sub(take_from_slot);
-                    }
+    for (idx, dist_type) in campaign.distribution_type.iter().enumerate() {
+        if new_claims.contains_key(&idx) {
+            // Only consider slots that have new claimable amounts
+            match dist_type {
+                DistributionType::LumpSum { .. } => lump_sum_slots_with_new_claims.push(idx),
+                DistributionType::LinearVesting { .. } => {
+                    linear_vesting_slots_with_new_claims.push(idx)
                 }
             }
         }
     }
-    // At this point, if initial checks were correct (actual_claim_amount_coin.amount <= sum of new_claims),
-    // remaining_to_distribute should be zero.
+
+    lump_sum_slots_with_new_claims.sort();
+    linear_vesting_slots_with_new_claims.sort();
+
+    // Helper function to distribute tokens to a list of slots
+    let distribute_to_slots =
+        |slots: Vec<DistributionSlot>,
+         remaining: &mut Uint128,
+         claims: &mut HashMap<DistributionSlot, Claim>| {
+            for slot_idx in slots {
+                if *remaining == Uint128::zero() {
+                    break;
+                }
+                // new_claims.get(&slot_idx) is guaranteed to return Some since slot_idx comes from slots with new claims
+                let (available_from_slot, _) = new_claims
+                    .get(&slot_idx)
+                    .expect("slot_idx must exist in new_claims");
+                let take_from_slot = std::cmp::min(*remaining, *available_from_slot);
+                if take_from_slot > Uint128::zero() {
+                    claims.insert(slot_idx, (take_from_slot, env.block.time.seconds()));
+                    *remaining = remaining.saturating_sub(take_from_slot);
+                }
+            }
+        };
+
+    // Phase 1: Distribute to LumpSum slots from new_claims
+    distribute_to_slots(
+        lump_sum_slots_with_new_claims,
+        &mut remaining_to_distribute,
+        &mut claims_to_record,
+    );
+
+    // Phase 2: Distribute remaining to LinearVesting slots from new_claims
+    distribute_to_slots(
+        linear_vesting_slots_with_new_claims,
+        &mut remaining_to_distribute,
+        &mut claims_to_record,
+    );
+
+    // Enforce the invariant that all requested tokens have been distributed
+    ensure!(
+        remaining_to_distribute == Uint128::zero(),
+        ContractError::CampaignError {
+            reason: format!(
+                "Distribution error: {remaining_to_distribute} tokens remain undistributed. This indicates a bug in the claimable amount calculation."
+            )
+        }
+    );
 
     let updated_claims = helpers::aggregate_claims(&previous_claims, &claims_to_record)?;
 
@@ -385,9 +390,15 @@ pub(crate) fn claim(
     CAMPAIGN.save(deps.storage, &campaign)?;
     CLAIMS.save(deps.storage, receiver.to_string(), &updated_claims)?;
 
+    // Calculate total claims from updated_claims instead of making another storage call
+    let total_claimed = updated_claims
+        .iter()
+        .fold(Uint128::zero(), |acc, (_, (amount, _))| {
+            acc.checked_add(*amount).unwrap()
+        });
+
     ensure!(
-        total_user_allocation
-            >= get_total_claims_amount_for_address(deps.as_ref(), receiver.as_ref())?,
+        total_user_allocation >= total_claimed,
         ContractError::ExceededMaxClaimAmount
     );
 
@@ -447,10 +458,8 @@ pub fn add_allocations(
     for (address_raw, amount) in allocations.into_iter() {
         let validated_receiver_string = validate_raw_address(deps.as_ref(), &address_raw)?;
 
-        let allocation: Option<Uint128> =
-            ALLOCATIONS.may_load(deps.storage, validated_receiver_string.as_str())?;
         ensure!(
-            allocation.is_none(),
+            !ALLOCATIONS.has(deps.storage, validated_receiver_string.as_str()),
             ContractError::AllocationAlreadyExists {
                 address: validated_receiver_string.clone(),
             }
@@ -482,8 +491,8 @@ pub fn replace_address(
     assert_authorized(deps.as_ref(), &info.sender)?;
 
     let old_address_canonical = validate_raw_address(deps.as_ref(), &old_address_raw)?;
-    // New address should be a valid cosmos address
-    let new_address_validated = deps.api.addr_validate(&new_address_raw)?;
+    // New address should be validated the same way as when adding allocations
+    let new_address_validated = validate_raw_address(deps.as_ref(), &new_address_raw)?;
 
     let old_allocation = ALLOCATIONS
         .may_load(deps.storage, old_address_canonical.as_str())?
@@ -493,9 +502,7 @@ pub fn replace_address(
 
     // Ensure the new address doesn't have an allocation already
     ensure!(
-        ALLOCATIONS
-            .may_load(deps.storage, new_address_validated.as_str())?
-            .is_none(),
+        !ALLOCATIONS.has(deps.storage, new_address_validated.as_str()),
         ContractError::AllocationAlreadyExists {
             address: new_address_raw.clone()
         }
@@ -516,7 +523,7 @@ pub fn replace_address(
 
     if is_blacklisted(deps.as_ref(), old_address_canonical.as_str())? {
         BLACKLIST.remove(deps.storage, old_address_canonical.as_str());
-        BLACKLIST.save(deps.storage, new_address_validated.as_str(), &true)?;
+        BLACKLIST.save(deps.storage, new_address_validated.as_str(), &())?;
     }
 
     Ok(Response::default().add_attributes(vec![
@@ -562,6 +569,10 @@ pub fn remove_address(
 
     ALLOCATIONS.remove(deps.storage, address.as_str());
 
+    // Also remove the blacklist entry when removing the address to maintain consistency
+    // This ensures blacklist doesn't persist for addresses that are no longer in the protocol
+    BLACKLIST.remove(deps.storage, address.as_str());
+
     Ok(Response::default()
         .add_attribute("action", "remove_address")
         .add_attribute("removed", address))
@@ -599,7 +610,7 @@ pub fn blacklist_address(
     }
 
     if blacklist {
-        BLACKLIST.save(deps.storage, address.as_str(), &true)?;
+        BLACKLIST.save(deps.storage, address.as_str(), &())?;
     } else {
         BLACKLIST.remove(deps.storage, address.as_str());
     }

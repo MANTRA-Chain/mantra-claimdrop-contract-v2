@@ -34,6 +34,32 @@ campaign, blacklist users, batch upload addresses.
 
 **Scenario 2:** Post Gendrop rewarding active liquidity providers with quarterly token allocations over 1 year based on their pool shares.
 
+## Breaking Changes (v2.0.0)
+
+### Removed `reward_denom` field
+The standalone `reward_denom` field has been removed from `CampaignParams`. The denomination is now exclusively derived from the `total_reward.denom` field.
+
+**Before (v1.x):**
+```rust
+CampaignParams {
+    name: "Campaign Name".to_string(),
+    reward_denom: "uom".to_string(),  // REMOVED
+    total_reward: coin(100_000, "uom"),
+    // ... other fields
+}
+```
+
+**After (v2.0.0):**
+```rust
+CampaignParams {
+    name: "Campaign Name".to_string(),
+    total_reward: coin(100_000, "uom"),  // Denom is taken from here
+    // ... other fields
+}
+```
+
+This change eliminates data redundancy and prevents potential synchronization issues between the two denom fields.
+
 ## Resources
 
 1. [Website](https://mantra.zone/)

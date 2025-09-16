@@ -27,7 +27,6 @@ fn test_sweep_non_reward_tokens() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign for sweep testing".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -133,7 +132,6 @@ fn test_sweep_cannot_sweep_reward_denom() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),
@@ -289,7 +287,6 @@ fn test_sweep_after_campaign_closed() {
                     name: "Test Campaign".to_string(),
                     description: "Test campaign".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: "uom".to_string(),
                     total_reward: coin(100_000, "uom"),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::one(),

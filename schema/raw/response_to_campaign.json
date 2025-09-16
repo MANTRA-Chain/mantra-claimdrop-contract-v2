@@ -9,7 +9,6 @@
     "distribution_type",
     "end_time",
     "name",
-    "reward_denom",
     "start_time",
     "total_reward",
     "type"
@@ -51,10 +50,6 @@
     },
     "name": {
       "description": "The campaign name",
-      "type": "string"
-    },
-    "reward_denom": {
-      "description": "The denom to be distributed as reward by the campaign",
       "type": "string"
     },
     "start_time": {

@@ -40,6 +40,9 @@ pub(crate) fn validate_campaign_params(
 /// Constant used for the fallback distribution slot
 const FALLBACK_DISTRIBUTION_SLOT: usize = 0usize;
 
+type DistributionClaims = HashMap<DistributionSlot, Claim>;
+type ClaimableResult = (Coin, DistributionClaims, DistributionClaims);
+
 /// Calculates the amount a user can claim at this point in time
 pub(crate) fn compute_claimable_amount(
     deps: Deps,
@@ -47,13 +50,12 @@ pub(crate) fn compute_claimable_amount(
     current_time: &Timestamp,
     address: &str,
     total_claimable_amount: Uint128,
-) -> Result<(Coin, HashMap<DistributionSlot, Claim>), ContractError> {
+) -> Result<ClaimableResult, ContractError> {
     let mut claimable_amount = Uint128::zero();
     let mut new_claims = HashMap::new();
+    let previous_claims_for_address = get_claims_for_address(deps, address.to_string())?;
 
     if campaign.has_started(current_time) {
-        let previous_claims_for_address = get_claims_for_address(deps, address.to_string())?;
-
         for (distribution_slot, distribution) in
             campaign.distribution_type.iter().enumerate().clone()
         {
@@ -101,7 +103,7 @@ pub(crate) fn compute_claimable_amount(
             campaign,
             current_time,
             total_claimable_amount,
-            previous_claims_for_address,
+            previous_claims_for_address.clone(),
             &new_claims,
         )?;
 
@@ -127,10 +129,11 @@ pub(crate) fn compute_claimable_amount(
 
     Ok((
         Coin {
-            denom: campaign.reward_denom.clone(),
+            denom: campaign.total_reward.denom.clone(),
             amount: claimable_amount,
         },
         new_claims,
+        previous_claims_for_address,
     ))
 }
 
@@ -160,10 +163,17 @@ fn calculate_claim_amount_for_distribution(
             let already_claimed =
                 previous_claim_for_this_slot.map_or(Uint128::zero(), |(amount, _)| *amount);
 
-            let distribution_duration = end_time.saturating_sub(*start_time);
+            // Calculate distribution duration with proper validation
+            // This should be guaranteed by validate_campaign_times but we double-check
+            let distribution_duration = end_time
+                .checked_sub(*start_time)
+                .ok_or_else(|| ContractError::InvalidInput {
+                    reason: format!(
+                        "Invalid distribution: end_time ({end_time}) is before start_time ({start_time})"
+                    ),
+                })?;
 
             // sanity check to ensure we don't get division by zero
-            // this should never happen since `validate_campaign_times` ensures that the start time is less than the end time
             ensure!(
                 distribution_duration > 0u64,
                 ContractError::CampaignError {
@@ -171,7 +181,15 @@ fn calculate_claim_amount_for_distribution(
                 }
             );
 
-            let time_passed_since_start = current_time.seconds().saturating_sub(*start_time);
+            // If current time is before distribution start, nothing is vested yet
+            if current_time.seconds() < *start_time {
+                return Ok(Uint128::zero());
+            }
+
+            let time_passed_since_start = current_time
+                .seconds()
+                .checked_sub(*start_time)
+                .expect("current_time >= start_time checked above");
             let effective_time_passed =
                 std::cmp::min(time_passed_since_start, distribution_duration);
 
@@ -189,7 +207,17 @@ fn calculate_claim_amount_for_distribution(
                 .to_uint_floor(),
             )?;
 
-            Ok(total_vested_for_slot_at_current_time.saturating_sub(already_claimed))
+            // Validate invariant: already_claimed should not exceed what's vested
+            // If it does, return 0 but log the issue
+            if already_claimed > total_vested_for_slot_at_current_time {
+                // This should not happen in normal operation but could occur due to
+                // rounding errors or if there was a bug in previous versions
+                return Ok(Uint128::zero());
+            }
+
+            Ok(total_vested_for_slot_at_current_time
+                .checked_sub(already_claimed)
+                .expect("already_claimed <= total_vested checked above"))
         }
         DistributionType::LumpSum { percentage, .. } => {
             let total_entitlement_for_lumpsum_slot = Uint128::try_from(
@@ -204,8 +232,17 @@ fn calculate_claim_amount_for_distribution(
             let already_claimed_for_this_slot =
                 previous_claim_for_this_slot.map_or(Uint128::zero(), |(amount, _)| *amount);
 
-            let newly_claimable =
-                total_entitlement_for_lumpsum_slot.saturating_sub(already_claimed_for_this_slot);
+            // Validate invariant: already_claimed should not exceed total entitlement
+            // If it does, return 0 but log the issue
+            if already_claimed_for_this_slot > total_entitlement_for_lumpsum_slot {
+                // This should not happen in normal operation but could occur due to
+                // rounding errors or if there was a bug in previous versions
+                return Ok(Uint128::zero());
+            }
+
+            let newly_claimable = total_entitlement_for_lumpsum_slot
+                .checked_sub(already_claimed_for_this_slot)
+                .expect("already_claimed <= total_entitlement checked above");
             Ok(newly_claimable)
         }
     }
@@ -223,11 +260,16 @@ fn get_compensation_for_rounding_errors(
     if distribution_types_ended(campaign, current_time) {
         let updated_claims = aggregate_claims(&previous_claims_for_address, new_claims)?;
 
-        let total_claimed = updated_claims
-            .iter()
-            .fold(Uint128::zero(), |acc, (_, (amount, _))| {
-                acc.checked_add(*amount).unwrap()
-            });
+        let total_claimed =
+            updated_claims
+                .iter()
+                .try_fold(Uint128::zero(), |acc, (_, (amount, _))| {
+                    acc.checked_add(*amount)
+                        .map_err(|_| ContractError::InvalidInput {
+                            reason: "arithmetic overflow calculating total claimed amount"
+                                .to_string(),
+                        })
+                })?;
 
         // get user dust to claim
         let (slot, _) = new_claims
