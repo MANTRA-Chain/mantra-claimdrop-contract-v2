@@ -40,6 +40,9 @@ pub(crate) fn validate_campaign_params(
 /// Constant used for the fallback distribution slot
 const FALLBACK_DISTRIBUTION_SLOT: usize = 0usize;
 
+type DistributionClaims = HashMap<DistributionSlot, Claim>;
+type ClaimableResult = (Coin, DistributionClaims, DistributionClaims);
+
 /// Calculates the amount a user can claim at this point in time
 pub(crate) fn compute_claimable_amount(
     deps: Deps,
@@ -47,14 +50,7 @@ pub(crate) fn compute_claimable_amount(
     current_time: &Timestamp,
     address: &str,
     total_claimable_amount: Uint128,
-) -> Result<
-    (
-        Coin,
-        HashMap<DistributionSlot, Claim>,
-        HashMap<DistributionSlot, Claim>,
-    ),
-    ContractError,
-> {
+) -> Result<ClaimableResult, ContractError> {
     let mut claimable_amount = Uint128::zero();
     let mut new_claims = HashMap::new();
     let previous_claims_for_address = get_claims_for_address(deps, address.to_string())?;
