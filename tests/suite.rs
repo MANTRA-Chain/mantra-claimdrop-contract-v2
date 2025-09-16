@@ -299,6 +299,17 @@ impl TestingSuite {
             result,
         )
     }
+
+    #[track_caller]
+    pub fn sweep(
+        &mut self,
+        sender: &Addr,
+        denom: String,
+        amount: Option<Uint128>,
+        result: impl ResultHandler,
+    ) -> &mut Self {
+        self.execute_contract(sender, ExecuteMsg::Sweep { denom, amount }, &[], result)
+    }
 }
 
 // queries

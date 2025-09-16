@@ -46,7 +46,6 @@ fn bug_large_numbers() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with no cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: denom.to_string(),
                     total_reward: coin(amount, denom),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),
@@ -128,7 +127,6 @@ fn bug_large_numbers_2() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with no cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: denom.to_string(),
                     total_reward: coin(amount, denom),
                     distribution_type: vec![DistributionType::LinearVesting {
                         percentage: Decimal::percent(100),
@@ -230,7 +228,6 @@ fn bug_large_numbers_3() {
                     name: "Test Airdrop I".to_string(),
                     description: "This is an airdrop with no cliff".to_string(),
                     ty: "airdrop".to_string(),
-                    reward_denom: denom.to_string(),
                     total_reward: coin(amount, denom),
                     distribution_type: vec![DistributionType::LumpSum {
                         percentage: Decimal::percent(100),

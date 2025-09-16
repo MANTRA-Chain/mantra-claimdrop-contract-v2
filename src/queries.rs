@@ -60,19 +60,19 @@ pub(crate) fn query_rewards(
     let total_claimed: Uint128 =
         get_total_claims_amount_for_address(deps, validated_receiver_string.as_str())?;
     if total_claimed > Uint128::zero() {
-        claimed.push(coin(total_claimed.u128(), &campaign.reward_denom));
+        claimed.push(coin(total_claimed.u128(), &campaign.total_reward.denom));
     }
 
     let pending_rewards = coin(
         total_claimable_amount.saturating_sub(total_claimed).u128(),
-        &campaign.reward_denom,
+        &campaign.total_reward.denom,
     );
 
     if pending_rewards.amount > Uint128::zero() {
         pending.push(pending_rewards);
     }
 
-    let (claimable_amount, _) = helpers::compute_claimable_amount(
+    let (claimable_amount, _, _) = helpers::compute_claimable_amount(
         deps,
         &campaign,
         &env.block.time,
@@ -142,7 +142,7 @@ pub(crate) fn query_claimed(
                 });
 
             if total_claimed > Uint128::zero() {
-                let denom = CAMPAIGN.load(deps.storage)?.reward_denom.clone();
+                let denom = CAMPAIGN.load(deps.storage)?.total_reward.denom.clone();
                 claimed.push((address, coin(total_claimed.u128(), denom)));
             }
         }
@@ -150,7 +150,7 @@ pub(crate) fn query_claimed(
         let limit = limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT) as usize;
         let start = start_from.map(Bound::exclusive);
 
-        let denom = CAMPAIGN.load(deps.storage)?.reward_denom.clone();
+        let denom = CAMPAIGN.load(deps.storage)?.total_reward.denom.clone();
 
         CLAIMS
             .range(deps.storage, start, None, Order::Ascending)
@@ -193,7 +193,7 @@ pub fn query_allocation(
 ) -> Result<AllocationsResponse, ContractError> {
     let campaign = CAMPAIGN.may_load(deps.storage)?;
     let denom = campaign
-        .map(|c| c.reward_denom)
+        .map(|c| c.total_reward.denom)
         .unwrap_or_else(|| "".to_string());
 
     let allocations = if let Some(address) = address {
