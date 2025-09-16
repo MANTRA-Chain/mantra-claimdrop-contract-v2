@@ -4474,7 +4474,7 @@ fn test_replace_address_with_placeholder_consistency() {
     let alice = &suite.senders[0].clone(); // Owner
     let bob = &suite.senders[1].clone(); // Valid cosmos address
     let placeholder1 = &Addr::unchecked("alice.eth");
-    let placeholder2 = &Addr::unchecked("bob.eth"); 
+    let placeholder2 = &Addr::unchecked("bob.eth");
     let current_time = &suite.get_time();
 
     suite.instantiate_claimdrop_contract(None); // Alice is owner
@@ -4483,7 +4483,7 @@ fn test_replace_address_with_placeholder_consistency() {
     suite
         .add_allocations(
             alice,
-&vec![(bob.to_string(), Uint128::new(100_000))],
+            &vec![(bob.to_string(), Uint128::new(100_000))],
             |result: Result<AppResponse, anyhow::Error>| {
                 result.unwrap();
             },
@@ -4491,34 +4491,32 @@ fn test_replace_address_with_placeholder_consistency() {
         // Upload allocation for placeholder address
         .add_allocations(
             alice,
-&vec![(placeholder1.to_string(), Uint128::new(50_000))],
+            &vec![(placeholder1.to_string(), Uint128::new(50_000))],
             |result: Result<AppResponse, anyhow::Error>| {
                 result.unwrap();
             },
         );
 
     // Test 1: Replace valid cosmos address with placeholder (should work)
-    suite
-        .replace_address(
-            alice,
-            bob,
-            placeholder2,
-            |result: Result<AppResponse, anyhow::Error>| {
-                result.unwrap();
-            },
-        );
+    suite.replace_address(
+        alice,
+        bob,
+        placeholder2,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
 
     // Test 2: Replace placeholder with another placeholder (should work)
     let placeholder3 = &Addr::unchecked("charlie.eth");
-    suite
-        .replace_address(
-            alice,
-            placeholder1,
-            placeholder3,
-            |result: Result<AppResponse, anyhow::Error>| {
-                result.unwrap();
-            },
-        );
+    suite.replace_address(
+        alice,
+        placeholder1,
+        placeholder3,
+        |result: Result<AppResponse, anyhow::Error>| {
+            result.unwrap();
+        },
+    );
 
     // Verify the replacements worked
     // Bob should have no allocation
