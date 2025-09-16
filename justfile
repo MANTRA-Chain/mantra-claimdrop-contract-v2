@@ -58,7 +58,7 @@ optimize:
     docker run --rm -v "$(pwd)":/code \
       --mount type=volume,source="$(basename "$(pwd)")_cache",target=/target \
       --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-      cosmwasm/optimizer-arm64:0.16.0
+      cosmwasm/optimizer-arm64:0.17.0
 
 # Stores the claimdrop contract on the given CHAIN, default is mantra-dukong.
 store CHAIN='mantra-dukong-1':
