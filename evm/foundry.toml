@@ -25,9 +25,9 @@ mantradukong = "${MANTRA_DUKONG_RPC_URL}"
 mantra = "${MANTRA_MAINNET_RPC_URL}"
 localhost = "http://localhost:8545"
 
-# Etherscan configuration for verification
+# Etherscan configuration for verification (MANTRA Explorer does not require API key)
 [etherscan]
-mantradukong = { key = "${MANTRA_API_KEY}", url = "https://evm.dukong.mantrachain.io/api" }
-mantra = { key = "${MANTRA_API_KEY}", url = "https://evm.mantrachain.io/api" }
+mantradukong = { key = "", url = "https://evm.dukong.mantrachain.io/api" }
+mantra = { key = "", url = "https://evm.mantrachain.io/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

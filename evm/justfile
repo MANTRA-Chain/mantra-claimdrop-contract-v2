@@ -71,10 +71,7 @@ deploy-testnet:
     forge script script/Deploy.s.sol:Deploy \
         --rpc-url $MANTRA_DUKONG_RPC_URL \
         --private-key $PRIVATE_KEY \
-        --broadcast \
-        --verify \
-        --verifier-url "https://evm.dukong.mantrachain.io/api" \
-        --etherscan-api-key $MANTRA_API_KEY || true
+        --broadcast
     echo "✅ Deployment complete!"
 
 # Deploy to MANTRA mainnet
@@ -100,20 +97,13 @@ deploy-mainnet:
     forge script script/Deploy.s.sol:Deploy \
         --rpc-url $MANTRA_MAINNET_RPC_URL \
         --private-key $PRIVATE_KEY \
-        --broadcast \
-        --verify \
-        --verifier-url "https://evm.mantrachain.io/api" \
-        --etherscan-api-key $MANTRA_API_KEY || true
+        --broadcast
     echo "✅ Deployment complete!"
 
 # Verify contract on block explorer
 verify CONTRACT_ADDRESS CHAIN="mantradukong":
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -z "${MANTRA_API_KEY:-}" ]; then
-        echo "❌ Error: MANTRA_API_KEY not set"
-        exit 1
-    fi
     if [ "{{CHAIN}}" = "mantradukong" ]; then
         VERIFIER_URL="https://evm.dukong.mantrachain.io/api"
     else
@@ -123,7 +113,6 @@ verify CONTRACT_ADDRESS CHAIN="mantradukong":
     forge verify-contract {{CONTRACT_ADDRESS}} \
         contracts/Claimdrop.sol:Claimdrop \
         --verifier-url $VERIFIER_URL \
-        --etherscan-api-key $MANTRA_API_KEY \
         --watch
     echo "✅ Verification complete!"
 

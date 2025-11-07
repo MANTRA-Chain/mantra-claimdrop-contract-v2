@@ -87,7 +87,6 @@ just deploy-local
 # Ensure .env is configured with:
 # - MANTRA_DUKONG_RPC_URL
 # - PRIVATE_KEY
-# - MANTRA_API_KEY
 
 just deploy-testnet
 ```
@@ -98,7 +97,6 @@ just deploy-testnet
 # Ensure .env is configured with:
 # - MANTRA_MAINNET_RPC_URL
 # - PRIVATE_KEY
-# - MANTRA_API_KEY
 
 just deploy-mainnet  # Includes confirmation prompt
 ```
@@ -195,9 +193,6 @@ MANTRA_MAINNET_RPC_URL=https://evm.mantrachain.io
 # Deployment
 PRIVATE_KEY=<your_private_key>
 OWNER_ADDRESS=<optional_owner_address>
-
-# Block Explorer
-MANTRA_API_KEY=<your_api_key>
 ```
 
 ### Compiler Settings (`foundry.toml`)
