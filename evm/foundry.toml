@@ -1,0 +1,33 @@
+[profile.default]
+src = "contracts"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+
+# Compiler settings (matching Hardhat config)
+solc = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+
+# Gas reporting
+gas_reports = ["*"]
+
+# Formatting
+line_length = 120
+tab_width = 4
+bracket_spacing = true
+
+# RPC endpoints
+[rpc_endpoints]
+mantradukong = "${MANTRA_DUKONG_RPC_URL}"
+mantra = "${MANTRA_MAINNET_RPC_URL}"
+localhost = "http://localhost:8545"
+
+# Etherscan configuration for verification
+[etherscan]
+mantradukong = { key = "${MANTRA_API_KEY}", url = "https://evm.dukong.mantrachain.io/api" }
+mantra = { key = "${MANTRA_API_KEY}", url = "https://evm.mantrachain.io/api" }
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

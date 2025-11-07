@@ -1,13 +1,22 @@
 node_modules
 .env
+.env.test
 coverage
 coverage.json
 typechain
 typechain-types
 
-# Hardhat files
-cache
+# Hardhat files (legacy)
 artifacts
+
+# Foundry files
+cache/
+out/
+broadcast/
+foundry.lock
+
+# Test files
+test-allocations.json
 
 # IDE
 .idea

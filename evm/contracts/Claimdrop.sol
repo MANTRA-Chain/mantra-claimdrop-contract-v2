@@ -50,40 +50,41 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
     /// @notice Type of distribution
     enum DistributionKind {
-        LinearVesting,  // Tokens vest linearly over time
-        LumpSum        // Tokens released at specific time
+        LinearVesting, // Tokens vest linearly over time
+        LumpSum // Tokens released at specific time
+
     }
 
     // ============ Structs ============
 
     /// @notice Distribution configuration
     struct Distribution {
-        DistributionKind kind;      // Type of distribution
-        uint16 percentageBps;       // Percentage in basis points (10000 = 100%)
-        uint64 startTime;           // Distribution start timestamp
-        uint64 endTime;             // Distribution end timestamp (0 for LumpSum)
-        uint64 cliffDuration;       // Cliff duration in seconds (0 for no cliff)
+        DistributionKind kind; // Type of distribution
+        uint16 percentageBps; // Percentage in basis points (10000 = 100%)
+        uint64 startTime; // Distribution start timestamp
+        uint64 endTime; // Distribution end timestamp (0 for LumpSum)
+        uint64 cliffDuration; // Cliff duration in seconds (0 for no cliff)
     }
 
     /// @notice Campaign configuration and state
     struct Campaign {
-        string name;                // Campaign name
-        string description;         // Campaign description
-        string campaignType;        // Campaign type identifier
-        address rewardToken;        // ERC20 token address
-        uint256 totalReward;        // Total tokens to distribute
+        string name; // Campaign name
+        string description; // Campaign description
+        string campaignType; // Campaign type identifier
+        address rewardToken; // ERC20 token address
+        uint256 totalReward; // Total tokens to distribute
         Distribution[] distributions; // Array of distribution types
-        uint64 startTime;           // Campaign start timestamp
-        uint64 endTime;             // Campaign end timestamp
-        uint256 claimed;            // Total amount claimed so far
-        uint64 closedAt;            // Campaign closure timestamp (0 if open)
-        bool exists;                // Campaign was created
+        uint64 startTime; // Campaign start timestamp
+        uint64 endTime; // Campaign end timestamp
+        uint256 claimed; // Total amount claimed so far
+        uint64 closedAt; // Campaign closure timestamp (0 if open)
+        bool exists; // Campaign was created
     }
 
     /// @notice Claim record for a specific distribution slot
     struct Claim {
-        uint128 amountClaimed;      // Amount claimed from this slot
-        uint64 timestamp;           // Last claim timestamp
+        uint128 amountClaimed; // Amount claimed from this slot
+        uint64 timestamp; // Last claim timestamp
     }
 
     // ============ State Variables ============
@@ -114,64 +115,32 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
     /// @notice Emitted when a campaign is created
     event CampaignCreated(
-        string name,
-        address indexed rewardToken,
-        uint256 totalReward,
-        uint64 startTime,
-        uint64 endTime
+        string name, address indexed rewardToken, uint256 totalReward, uint64 startTime, uint64 endTime
     );
 
     /// @notice Emitted when a campaign is closed
-    event CampaignClosed(
-        uint64 indexed closedAt,
-        uint256 refundedAmount,
-        address indexed recipient
-    );
+    event CampaignClosed(uint64 indexed closedAt, uint256 refundedAmount, address indexed recipient);
 
     /// @notice Emitted when allocations are added
-    event AllocationsAdded(
-        uint256 indexed count,
-        uint256 indexed totalAmount
-    );
+    event AllocationsAdded(uint256 indexed count, uint256 indexed totalAmount);
 
     /// @notice Emitted when tokens are claimed
-    event Claimed(
-        address indexed user,
-        uint256 indexed amount,
-        address indexed sender
-    );
+    event Claimed(address indexed user, uint256 indexed amount, address indexed sender);
 
     /// @notice Emitted when an address is replaced
-    event AddressReplaced(
-        address indexed oldAddress,
-        address indexed newAddress,
-        uint256 indexed allocation
-    );
+    event AddressReplaced(address indexed oldAddress, address indexed newAddress, uint256 indexed allocation);
 
     /// @notice Emitted when an address is removed
-    event AddressRemoved(
-        address indexed addr,
-        uint256 indexed allocation
-    );
+    event AddressRemoved(address indexed addr, uint256 indexed allocation);
 
     /// @notice Emitted when blacklist status changes
-    event BlacklistUpdated(
-        address indexed addr,
-        bool indexed blacklisted
-    );
+    event BlacklistUpdated(address indexed addr, bool indexed blacklisted);
 
     /// @notice Emitted when authorized wallet status changes
-    event AuthorizedWalletUpdated(
-        address indexed wallet,
-        bool indexed authorized
-    );
+    event AuthorizedWalletUpdated(address indexed wallet, bool indexed authorized);
 
     /// @notice Emitted when tokens are swept
-    event Swept(
-        address indexed token,
-        address indexed recipient,
-        uint256 amount
-    );
+    event Swept(address indexed token, address indexed recipient, uint256 amount);
 
     // ============ Errors ============
 
@@ -293,10 +262,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Add allocations in batch
     /// @param addresses Array of addresses
     /// @param amounts Array of allocation amounts
-    function addAllocations(
-        address[] calldata addresses,
-        uint256[] calldata amounts
-    ) external onlyAuthorized whenNotPaused {
+    function addAllocations(address[] calldata addresses, uint256[] calldata amounts)
+        external
+        onlyAuthorized
+        whenNotPaused
+    {
         if (!campaign.exists) revert CampaignNotFound();
         if (block.timestamp >= campaign.startTime) revert CampaignHasStarted();
         if (addresses.length != amounts.length) revert ArrayLengthMismatch();
@@ -330,11 +300,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Replace an address (migrate allocation and claims)
     /// @param oldAddress Address to replace
     /// @param newAddress New address
-    function replaceAddress(
-        address oldAddress,
-        address newAddress
-    ) external onlyAuthorized {
-        if (oldAddress == address(0) || newAddress == address(0)) revert ZeroAddress();
+    function replaceAddress(address oldAddress, address newAddress) external onlyAuthorized {
+        if (oldAddress == address(0) || newAddress == address(0)) {
+            revert ZeroAddress();
+        }
 
         uint256 allocation = allocations[oldAddress];
         if (allocation == 0) revert NoAllocation(oldAddress);
@@ -383,10 +352,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Claim tokens
     /// @param receiver Address to receive tokens
     /// @param amount Amount to claim (0 for maximum available)
-    function claim(
-        address receiver,
-        uint256 amount
-    ) external nonReentrant whenNotPaused {
+    function claim(address receiver, uint256 amount) external nonReentrant whenNotPaused {
         if (!campaign.exists) revert CampaignNotFound();
         if (block.timestamp < campaign.startTime) revert CampaignNotStarted();
         if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
@@ -403,11 +369,15 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
         // Determine claim amount
         uint256 claimAmount = amount == 0 ? claimable : amount;
-        if (claimAmount > claimable) revert ExceedsClaimable(claimAmount, claimable);
+        if (claimAmount > claimable) {
+            revert ExceedsClaimable(claimAmount, claimable);
+        }
 
         // Validate contract balance
         uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
-        if (contractBalance < claimAmount) revert InsufficientBalance(claimAmount, contractBalance);
+        if (contractBalance < claimAmount) {
+            revert InsufficientBalance(claimAmount, contractBalance);
+        }
 
         // Distribute to slots
         uint256[] memory distribution = _distributeToSlots(claimAmount, slotAmounts);
@@ -428,7 +398,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
         // Validate invariant
         uint256 totalClaimed = _getTotalClaimedForAddress(receiver);
-        if (totalClaimed > allocation) revert ExceedsAllocation(totalClaimed, allocation);
+        if (totalClaimed > allocation) {
+            revert ExceedsAllocation(totalClaimed, allocation);
+        }
 
         // Transfer tokens
         IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
@@ -441,10 +413,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Update blacklist status for an address
     /// @param addr Address to blacklist/unblacklist
     /// @param blacklisted Blacklist status
-    function blacklistAddress(
-        address addr,
-        bool blacklisted
-    ) external onlyAuthorized {
+    function blacklistAddress(address addr, bool blacklisted) external onlyAuthorized {
         if (addr == owner()) revert CannotBlacklistOwner();
 
         blacklist[addr] = blacklisted;
@@ -455,10 +424,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Manage authorized wallets in batch
     /// @param addresses Array of addresses
     /// @param authorized Authorization status
-    function manageAuthorizedWallets(
-        address[] calldata addresses,
-        bool authorized
-    ) external onlyOwner {
+    function manageAuthorizedWallets(address[] calldata addresses, bool authorized) external onlyOwner {
         if (addresses.length == 0 || addresses.length > MAX_AUTHORIZED_WALLETS_BATCH_SIZE) {
             revert InvalidBatchSize(addresses.length, MAX_AUTHORIZED_WALLETS_BATCH_SIZE);
         }
@@ -476,10 +442,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Sweep non-reward tokens from contract
     /// @param token Token address to sweep
     /// @param amount Amount to sweep
-    function sweep(
-        address token,
-        uint256 amount
-    ) external onlyOwner nonReentrant {
+    function sweep(address token, uint256 amount) external onlyOwner nonReentrant {
         // Prevent sweeping reward token if campaign exists and is not closed
         if (campaign.exists && campaign.closedAt == 0 && token == campaign.rewardToken) {
             revert CannotSweepRewardToken();
@@ -538,16 +501,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @return claimed Total claimed
     /// @return pending Total claimable now
     /// @return total Total allocation
-    function getRewards(address addr) external view returns (
-        uint256 claimed,
-        uint256 pending,
-        uint256 total
-    ) {
+    function getRewards(address addr) external view returns (uint256 claimed, uint256 pending, uint256 total) {
         total = allocations[addr];
         claimed = _getTotalClaimedForAddress(addr);
 
         if (campaign.exists && block.timestamp >= campaign.startTime && campaign.closedAt == 0) {
-            (pending, ) = _computeClaimableAmount(addr, total);
+            (pending,) = _computeClaimableAmount(addr, total);
         } else {
             pending = 0;
         }
@@ -579,11 +538,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param distributions Array of distributions
     /// @param startTime Campaign start time
     /// @param endTime Campaign end time
-    function _validateCampaignParams(
-        Distribution[] calldata distributions,
-        uint64 startTime,
-        uint64 endTime
-    ) internal view {
+    function _validateCampaignParams(Distribution[] calldata distributions, uint64 startTime, uint64 endTime)
+        internal
+        view
+    {
         // Validate time window
         if (startTime <= block.timestamp) revert InvalidTimeWindow();
         if (endTime <= startTime) revert InvalidTimeWindow();
@@ -616,10 +574,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation User's total allocation
     /// @return claimable Total claimable amount
     /// @return slotAmounts Array of claimable per slot
-    function _computeClaimableAmount(
-        address user,
-        uint256 allocation
-    ) internal view returns (uint256 claimable, uint256[] memory slotAmounts) {
+    function _computeClaimableAmount(address user, uint256 allocation)
+        internal
+        view
+        returns (uint256 claimable, uint256[] memory slotAmounts)
+    {
         slotAmounts = new uint256[](campaign.distributions.length);
         claimable = 0;
 
@@ -670,11 +629,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
     /// @return Claimable amount for this distribution
-    function _calculateLinearVesting(
-        Distribution storage dist,
-        uint256 allocation,
-        Claim storage prevClaim
-    ) internal view returns (uint256) {
+    function _calculateLinearVesting(Distribution storage dist, uint256 allocation, Claim storage prevClaim)
+        internal
+        view
+        returns (uint256)
+    {
         // Calculate allocation for this distribution
         uint256 distributionAllocation = (allocation * dist.percentageBps) / BASIS_POINTS_TOTAL;
 
@@ -701,11 +660,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
     /// @return Claimable amount for this distribution
-    function _calculateLumpSum(
-        Distribution storage dist,
-        uint256 allocation,
-        Claim storage prevClaim
-    ) internal view returns (uint256) {
+    function _calculateLumpSum(Distribution storage dist, uint256 allocation, Claim storage prevClaim)
+        internal
+        view
+        returns (uint256)
+    {
         // Calculate allocation for this distribution
         uint256 distributionAllocation = (allocation * dist.percentageBps) / BASIS_POINTS_TOTAL;
 
@@ -761,10 +720,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param amount Amount to distribute
     /// @param slotAmounts Available amounts per slot
     /// @return distribution Distribution per slot
-    function _distributeToSlots(
-        uint256 amount,
-        uint256[] memory slotAmounts
-    ) internal view returns (uint256[] memory distribution) {
+    function _distributeToSlots(uint256 amount, uint256[] memory slotAmounts)
+        internal
+        view
+        returns (uint256[] memory distribution)
+    {
         distribution = new uint256[](campaign.distributions.length);
         uint256 remaining = amount;
 
@@ -784,7 +744,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
         // Phase 2: Distribute to LinearVesting slots
         for (uint256 i = 0; i < campaign.distributions.length; i++) {
-            if (campaign.distributions[i].kind != DistributionKind.LinearVesting) continue;
+            if (campaign.distributions[i].kind != DistributionKind.LinearVesting) {
+                continue;
+            }
 
             uint256 available = slotAmounts[i];
             if (available == 0) continue;
