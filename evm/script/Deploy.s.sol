@@ -11,18 +11,28 @@ import {Claimdrop} from "../contracts/Claimdrop.sol";
  */
 contract Deploy is Script {
     function run() external returns (Claimdrop) {
-        // Get owner address from environment or use msg.sender
-        address owner = vm.envOr("OWNER_ADDRESS", msg.sender);
+        bool useLedger = vm.envExists("USE_LEDGER") && vm.envBool("USE_LEDGER");
+        address deployer;
 
         console.log("Deploying Claimdrop contract...");
-        console.log("Deploying with account:", msg.sender);
-        console.log("Owner will be:", owner);
-        console.log("Account balance:", msg.sender.balance / 1e18, "ETH");
+        if (useLedger) {
+            deployer = vm.envAddress("LEDGER_ADDRESS");
+            console.log("Using Ledger as deployer, address is ", deployer);
+            vm.startBroadcast(deployer);
+        } else {
+            uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+            deployer = vm.addr(deployerPrivateKey);
+            console.log("Using private key as deployer, address is ", deployer);
+            vm.startBroadcast(deployerPrivateKey);
+        }
 
-        vm.startBroadcast();
+        // Check deployer balance
+        uint256 balance = deployer.balance;
+        console.log("Deployer balance:", (balance / 1e18), ".", (balance % 1e18));
+
 
         // Deploy contract
-        Claimdrop claimdrop = new Claimdrop(owner);
+        Claimdrop claimdrop = new Claimdrop(deployer);
 
         vm.stopBroadcast();
 
