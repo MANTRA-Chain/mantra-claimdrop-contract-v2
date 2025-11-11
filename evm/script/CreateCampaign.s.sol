@@ -3,11 +3,21 @@ pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Claimdrop} from "../contracts/Claimdrop.sol";
+import {E2ENetworkConfig} from "./e2e/E2ENetworkConfig.sol";
 
 /**
  * @title CreateCampaign
- * @notice Script to create a campaign on deployed Claimdrop contract
- * @dev Run with: forge script script/CreateCampaign.s.sol:CreateCampaign --rpc-url $RPC_URL --broadcast
+ * @notice Multi-network script to create a campaign on deployed Claimdrop contract
+ * @dev Run with: NETWORK=<network> forge script script/CreateCampaign.s.sol:CreateCampaign --rpc-url $RPC_URL --broadcast
+ *
+ * Network-Aware Mode (Recommended for E2E Testing):
+ *   - Set NETWORK env var (local, dukong, canary, mainnet)
+ *   - Set USE_NETWORK_PROFILE=true to use network's timing profile
+ *   - Timing automatically adapted based on network (fast for local, realistic for testnet/mainnet)
+ *
+ * Manual Configuration Mode (Production Campaigns):
+ *   - Set all campaign parameters via environment variables (see below)
+ *   - Timing fully controlled by user
  *
  * Required environment variables:
  * - CLAIMDROP_ADDRESS: Address of deployed Claimdrop contract
@@ -16,6 +26,8 @@ import {Claimdrop} from "../contracts/Claimdrop.sol";
  * - CAMPAIGN_TYPE: Type identifier (e.g., "airdrop")
  * - REWARD_TOKEN: Address of ERC20 reward token
  * - TOTAL_REWARD: Total reward amount in wei
+ *
+ * Timing Configuration (if not using USE_NETWORK_PROFILE):
  * - CAMPAIGN_START_TIME: Unix timestamp for campaign start
  * - CAMPAIGN_END_TIME: Unix timestamp for campaign end
  *
@@ -28,7 +40,10 @@ import {Claimdrop} from "../contracts/Claimdrop.sol";
  *
  * Optional second distribution (DIST_1_*) with same parameters
  *
- * Example:
+ * Example (Network-Aware):
+ * NETWORK=dukong USE_NETWORK_PROFILE=true CLAIMDROP_ADDRESS=0x123... REWARD_TOKEN=0x456...
+ *
+ * Example (Manual):
  * CLAIMDROP_ADDRESS=0x123...
  * CAMPAIGN_NAME="MANTRA Airdrop Q1 2025"
  * CAMPAIGN_DESCRIPTION="Quarterly token distribution"
@@ -48,18 +63,46 @@ import {Claimdrop} from "../contracts/Claimdrop.sol";
  * DIST_1_END_TIME=1767225600
  * DIST_1_CLIFF_DURATION=2592000
  */
-contract CreateCampaign is Script {
+contract CreateCampaign is Script, E2ENetworkConfig {
     function run() external {
+        // Load and validate network configuration
+        NetworkConfig memory network = getNetworkConfig();
+        console.log("Network:", network.name);
+
+        // Check if using network profile for timing
+        bool useNetworkProfile = vm.envOr("USE_NETWORK_PROFILE", false);
+
         // Load required parameters
         address claimdropAddress = vm.envAddress("CLAIMDROP_ADDRESS");
-        string memory name = vm.envString("CAMPAIGN_NAME");
-        string memory description = vm.envString("CAMPAIGN_DESCRIPTION");
-        string memory campaignType = vm.envString("CAMPAIGN_TYPE");
+        string memory name = vm.envOr("CAMPAIGN_NAME", string("Test Campaign"));
+        string memory description = vm.envOr("CAMPAIGN_DESCRIPTION", string("E2E test campaign"));
+        string memory campaignType = vm.envOr("CAMPAIGN_TYPE", string("airdrop"));
         address rewardToken = vm.envAddress("REWARD_TOKEN");
         uint256 totalReward = vm.envUint("TOTAL_REWARD");
-        uint64 startTime = uint64(vm.envUint("CAMPAIGN_START_TIME"));
-        uint64 endTime = uint64(vm.envUint("CAMPAIGN_END_TIME"));
 
+        uint64 startTime;
+        uint64 endTime;
+
+        if (useNetworkProfile) {
+            // Use network timing profile
+            TimingProfile memory timing = getTimingProfile(network);
+            console.log("Using network timing profile:", timing.name);
+            logTimingProfile(timing);
+
+            startTime = uint64(block.timestamp + timing.startDelay);
+            endTime = uint64(startTime + timing.campaignDuration);
+
+            console.log("");
+            console.log("Calculated campaign timing:");
+            console.log("Start time:", startTime);
+            console.log("End time:", endTime);
+        } else {
+            // Use manual timing from env vars
+            startTime = uint64(vm.envUint("CAMPAIGN_START_TIME"));
+            endTime = uint64(vm.envUint("CAMPAIGN_END_TIME"));
+        }
+
+        console.log("");
         console.log("=== Creating Campaign ===");
         console.log("Claimdrop address:", claimdropAddress);
         console.log("Campaign name:", name);
@@ -69,19 +112,28 @@ contract CreateCampaign is Script {
         console.log("End time:", endTime);
 
         // Build distributions array
-        Claimdrop.Distribution[] memory distributions = new Claimdrop.Distribution[](0);
+        Claimdrop.Distribution[] memory distributions;
 
-        // Load first distribution (always required)
-        if (bytes(vm.envOr("DIST_0_KIND", string(""))).length > 0) {
-            distributions = addDistribution(distributions, 0);
+        if (useNetworkProfile) {
+            // Use network timing profile for distributions
+            TimingProfile memory timing = getTimingProfile(network);
+            distributions = buildDistributionsFromProfile(timing, startTime, endTime);
+        } else {
+            // Build from env vars
+            distributions = new Claimdrop.Distribution[](0);
+
+            // Load first distribution (always required)
+            if (bytes(vm.envOr("DIST_0_KIND", string(""))).length > 0) {
+                distributions = addDistribution(distributions, 0);
+            }
+
+            // Load second distribution if present
+            if (bytes(vm.envOr("DIST_1_KIND", string(""))).length > 0) {
+                distributions = addDistribution(distributions, 1);
+            }
+
+            require(distributions.length > 0, "At least one distribution required");
         }
-
-        // Load second distribution if present
-        if (bytes(vm.envOr("DIST_1_KIND", string(""))).length > 0) {
-            distributions = addDistribution(distributions, 1);
-        }
-
-        require(distributions.length > 0, "At least one distribution required");
 
         // Validate percentages sum to 100%
         uint256 totalPercentage = 0;
@@ -165,5 +217,40 @@ contract CreateCampaign is Script {
         });
 
         return newDistributions;
+    }
+
+    /**
+     * @notice Build distributions from timing profile
+     * @param timing Timing profile
+     * @param campaignStartTime Campaign start timestamp
+     * @param campaignEndTime Campaign end timestamp
+     * @return distributions Array of distribution configurations
+     */
+    function buildDistributionsFromProfile(
+        TimingProfile memory timing,
+        uint64 campaignStartTime,
+        uint64 campaignEndTime
+    ) internal pure returns (Claimdrop.Distribution[] memory distributions) {
+        distributions = new Claimdrop.Distribution[](2);
+
+        // Distribution 0: Lump Sum
+        distributions[0] = Claimdrop.Distribution({
+            kind: Claimdrop.DistributionKind.LumpSum,
+            percentageBps: timing.lumpSumPercentageBps,
+            startTime: campaignStartTime,
+            endTime: 0, // LumpSum doesn't have end time
+            cliffDuration: 0 // LumpSum doesn't have cliff
+        });
+
+        // Distribution 1: Linear Vesting
+        distributions[1] = Claimdrop.Distribution({
+            kind: Claimdrop.DistributionKind.LinearVesting,
+            percentageBps: timing.vestingPercentageBps,
+            startTime: campaignStartTime,
+            endTime: uint64(campaignStartTime + timing.vestingDuration),
+            cliffDuration: uint64(timing.cliffDuration)
+        });
+
+        return distributions;
     }
 }

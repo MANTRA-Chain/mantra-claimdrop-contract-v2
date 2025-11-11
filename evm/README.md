@@ -2,6 +2,23 @@
 
 Token distribution contract with vesting capabilities for Ethereum-compatible chains.
 
+## Multi-Network Testing
+
+This implementation supports **unified multi-network testing** across all MANTRA networks (local, DuKong testnet, Canary staging, mainnet) with a single command interface.
+
+**Quick Start**:
+```bash
+just networks              # List available networks
+just deploy local          # Deploy to local Anvil
+just deploy dukong         # Deploy to DuKong testnet
+```
+
+**📚 Full Documentation**: See [README-MULTINETWORK.md](./README-MULTINETWORK.md) for complete multi-network guide including:
+- Network configuration and timing profiles
+- Environment setup and .env examples
+- Troubleshooting common issues
+- Migration guide from old per-network commands
+
 ## Features
 
 - **Campaign management** (create/close)

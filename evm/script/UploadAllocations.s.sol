@@ -3,11 +3,16 @@ pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
 import {Claimdrop} from "../contracts/Claimdrop.sol";
+import {E2ENetworkConfig} from "./e2e/E2ENetworkConfig.sol";
 
 /**
  * @title UploadAllocations
- * @notice Script to upload allocations in batches to Claimdrop contract
- * @dev Run with: forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url $RPC_URL --broadcast
+ * @notice Multi-network script to upload allocations in batches to Claimdrop contract
+ * @dev Run with: NETWORK=<network> forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url $RPC_URL --broadcast
+ *
+ * Network Selection:
+ *   - Set NETWORK env var: local, dukong, canary, mainnet
+ *   - If not set, auto-detects from connected RPC's ChainID
  *
  * Required environment variables:
  * - CLAIMDROP_ADDRESS: Address of deployed Claimdrop contract
@@ -21,12 +26,11 @@ import {Claimdrop} from "../contracts/Claimdrop.sol";
  *
  * The script will automatically batch allocations in groups of 3000 (MAX_ALLOCATION_BATCH_SIZE).
  *
- * Example:
- * CLAIMDROP_ADDRESS=0x123...
- * ALLOCATIONS_FILE=./allocations.json
- * forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url $RPC_URL --broadcast
+ * Examples:
+ * NETWORK=local CLAIMDROP_ADDRESS=0x123... ALLOCATIONS_FILE=./allocations.json forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url http://localhost:8545 --broadcast
+ * NETWORK=dukong CLAIMDROP_ADDRESS=0x123... ALLOCATIONS_FILE=./allocations.json forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url $MANTRA_DUKONG_RPC_URL --broadcast
  */
-contract UploadAllocations is Script {
+contract UploadAllocations is Script, E2ENetworkConfig {
     uint256 constant BATCH_SIZE = 3000;
 
     struct Allocation {
@@ -35,6 +39,11 @@ contract UploadAllocations is Script {
     }
 
     function run() external {
+        // Load and validate network configuration
+        NetworkConfig memory network = getNetworkConfig();
+        console.log("Network:", network.name);
+        console.log("");
+
         // Load required parameters
         address claimdropAddress = vm.envAddress("CLAIMDROP_ADDRESS");
         string memory allocationsFilePath = vm.envString("ALLOCATIONS_FILE");

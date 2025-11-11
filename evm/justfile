@@ -1,5 +1,17 @@
 # EVM Claimdrop Contract - Build and Deployment Commands
 # Uses Foundry (forge) for all operations
+#
+# Multi-Network Support:
+#   - local: Local Anvil node (ChainID: 31337)
+#   - dukong: MANTRA DuKong Testnet (ChainID: 5887)
+#   - canary: MANTRA Canary Staging Network (ChainID: 7888)
+#   - mainnet: MANTRA Mainnet (ChainID: 5888)
+#
+# Examples:
+#   just deploy local          # Deploy to local Anvil
+#   just deploy dukong         # Deploy to DuKong testnet
+#   just e2e dukong            # Run full E2E suite on DuKong
+#   just networks              # List all available networks
 
 # Default recipe - show available commands
 default:
@@ -50,55 +62,115 @@ clean:
     @echo "🧹 Cleaning build artifacts..."
     @forge clean
 
-# Deploy to local Anvil node
-deploy-local:
-    @echo "🚀 Deploying to local Anvil..."
-    @forge script script/Deploy.s.sol:Deploy --rpc-url http://localhost:8545 --broadcast
+# =============================================================================
+# Multi-Network Helpers (Internal)
+# =============================================================================
 
-# Deploy to MANTRA Dukong testnet
-deploy-testnet:
+# Get RPC URL for network
+_get-rpc NETWORK:
     #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
+    case "{{NETWORK}}" in
+        local)     echo "http://localhost:8545" ;;
+        dukong)    echo "${MANTRA_DUKONG_RPC_URL:-https://evm.dukong.mantrachain.io}" ;;
+        canary)    echo "${MANTRA_CANARY_RPC_URL:-https://evm.canary.mantrachain.dev}" ;;
+        mainnet)   echo "${MANTRA_MAINNET_RPC_URL:-https://evm.mantrachain.io}" ;;
+        *)         echo "❌ Unknown network: {{NETWORK}}" >&2
+                   echo "Run 'just networks' to see available networks" >&2
+                   exit 1 ;;
+    esac
+
+# Validate network is configured
+_validate-network NETWORK:
+    #!/usr/bin/env bash
+    RPC=$(just _get-rpc {{NETWORK}} 2>/dev/null) || exit 1
+    if [ -z "$RPC" ]; then
+        echo "❌ Network '{{NETWORK}}' RPC URL not configured"
         exit 1
     fi
+
+# Check if PRIVATE_KEY is set (required for broadcasting)
+_check-private-key:
+    #!/usr/bin/env bash
     if [ -z "${PRIVATE_KEY:-}" ]; then
         echo "❌ Error: PRIVATE_KEY not set"
+        echo "Set PRIVATE_KEY in your .env file or environment"
         exit 1
     fi
-    echo "🚀 Deploying to MANTRA Dukong testnet..."
-    forge script script/Deploy.s.sol:Deploy \
-        --rpc-url $MANTRA_DUKONG_RPC_URL \
-        --private-key $PRIVATE_KEY \
+
+# =============================================================================
+# Network Information
+# =============================================================================
+
+# List available networks
+networks:
+    @echo "📡 Available Networks:"
+    @echo ""
+    @echo "  local    - Local Anvil Node"
+    @echo "             ChainID: 31337"
+    @echo "             RPC: http://localhost:8545"
+    @echo "             Usage: Development and rapid testing"
+    @echo ""
+    @echo "  dukong   - MANTRA DuKong Testnet"
+    @echo "             ChainID: 5887"
+    @echo "             RPC: https://evm.dukong.mantrachain.io"
+    @echo "             Explorer: https://mantrascan.io/dukong"
+    @echo "             Faucet: https://faucet.dukong.mantrachain.io"
+    @echo "             Usage: Primary testnet for realistic E2E testing"
+    @echo ""
+    @echo "  canary   - MANTRA Canary Staging Network"
+    @echo "             ChainID: 7888"
+    @echo "             RPC: https://evm.canary.mantrachain.dev"
+    @echo "             Usage: Pre-production validation before mainnet"
+    @echo ""
+    @echo "  mainnet  - MANTRA Mainnet"
+    @echo "             ChainID: 5888"
+    @echo "             RPC: https://evm.mantrachain.io"
+    @echo "             Explorer: https://mantrascan.io"
+    @echo "             Usage: Production (fork testing only)"
+    @echo ""
+    @echo "Examples:"
+    @echo "  just deploy local          # Deploy to local Anvil"
+    @echo "  just deploy dukong         # Deploy to DuKong testnet"
+    @echo "  just create-campaign canary   # Create campaign on Canary"
+    @echo ""
+
+# =============================================================================
+# Unified Multi-Network Commands
+# =============================================================================
+
+# Deploy Claimdrop contract to specified network
+deploy NETWORK:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _validate-network {{NETWORK}}
+    RPC=$(just _get-rpc {{NETWORK}})
+
+    # Mainnet safety check
+    if [ "{{NETWORK}}" = "mainnet" ]; then
+        echo "⚠️  Deploying to MAINNET - please confirm"
+        read -p "Continue? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Deployment cancelled"
+            exit 1
+        fi
+    fi
+
+    # Local network doesn't need PRIVATE_KEY (uses default Anvil account)
+    if [ "{{NETWORK}}" != "local" ]; then
+        just _check-private-key
+    fi
+
+    echo "🚀 Deploying to {{NETWORK}}..."
+    NETWORK={{NETWORK}} forge script script/Deploy.s.sol:Deploy \
+        --rpc-url $RPC \
         --broadcast
     echo "✅ Deployment complete!"
 
-# Deploy to MANTRA mainnet
-deploy-mainnet:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    echo "⚠️  Deploying to MAINNET - please confirm"
-    read -p "Continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Deployment cancelled"
-        exit 1
-    fi
-    echo "🚀 Deploying to MANTRA mainnet..."
-    forge script script/Deploy.s.sol:Deploy \
-        --rpc-url $MANTRA_MAINNET_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Deployment complete!"
+# Legacy aliases (backward compatibility)
+deploy-local: (deploy "local")
+deploy-testnet: (deploy "dukong")
+deploy-mainnet: (deploy "mainnet")
 
 # Deploy upgradeable ClaimdropFactory to local Anvil node
 deploy-factory-local:
@@ -237,105 +309,73 @@ verify CONTRACT_ADDRESS CHAIN="mantradukong":
         --watch
     echo "✅ Verification complete!"
 
-# Create campaign on local Anvil (requires .env with campaign parameters)
-create-campaign-local:
-    @echo "📋 Creating campaign on local Anvil..."
-    @forge script script/CreateCampaign.s.sol:CreateCampaign --rpc-url http://localhost:8545 --broadcast
-
-# Create campaign on testnet (requires .env with campaign parameters)
-create-campaign-testnet:
+# Create campaign on specified network
+create-campaign NETWORK:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
-        exit 1
+    just _validate-network {{NETWORK}}
+    RPC=$(just _get-rpc {{NETWORK}})
+
+    # Mainnet safety check
+    if [ "{{NETWORK}}" = "mainnet" ]; then
+        echo "⚠️  Creating campaign on MAINNET - please confirm"
+        read -p "Continue? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Campaign creation cancelled"
+            exit 1
+        fi
     fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
+
+    # Local network doesn't need PRIVATE_KEY
+    if [ "{{NETWORK}}" != "local" ]; then
+        just _check-private-key
     fi
-    echo "📋 Creating campaign on MANTRA Dukong testnet..."
-    forge script script/CreateCampaign.s.sol:CreateCampaign \
-        --rpc-url $MANTRA_DUKONG_RPC_URL \
-        --private-key $PRIVATE_KEY \
+
+    echo "📋 Creating campaign on {{NETWORK}}..."
+    NETWORK={{NETWORK}} forge script script/CreateCampaign.s.sol:CreateCampaign \
+        --rpc-url $RPC \
         --broadcast
     echo "✅ Campaign created!"
 
-# Create campaign on mainnet (requires .env with campaign parameters)
-create-campaign-mainnet:
+# Legacy aliases
+create-campaign-local: (create-campaign "local")
+create-campaign-testnet: (create-campaign "dukong")
+create-campaign-mainnet: (create-campaign "mainnet")
+
+# Upload allocations to specified network
+upload-allocations NETWORK:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    echo "⚠️  Creating campaign on MAINNET - please confirm"
-    read -p "Continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Campaign creation cancelled"
-        exit 1
-    fi
-    echo "📋 Creating campaign on MANTRA mainnet..."
-    forge script script/CreateCampaign.s.sol:CreateCampaign \
-        --rpc-url $MANTRA_MAINNET_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Campaign created!"
+    just _validate-network {{NETWORK}}
+    RPC=$(just _get-rpc {{NETWORK}})
 
-# Upload allocations to local Anvil (requires .env with CLAIMDROP_ADDRESS and ALLOCATIONS_FILE)
-upload-allocations-local:
-    @echo "📤 Uploading allocations to local Anvil..."
-    @forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url http://localhost:8545 --broadcast
+    # Mainnet safety check
+    if [ "{{NETWORK}}" = "mainnet" ]; then
+        echo "⚠️  Uploading allocations to MAINNET - please confirm"
+        read -p "Continue? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Allocation upload cancelled"
+            exit 1
+        fi
+    fi
 
-# Upload allocations to testnet (requires .env with CLAIMDROP_ADDRESS and ALLOCATIONS_FILE)
-upload-allocations-testnet:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
-        exit 1
+    # Local network doesn't need PRIVATE_KEY
+    if [ "{{NETWORK}}" != "local" ]; then
+        just _check-private-key
     fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    echo "📤 Uploading allocations to MANTRA Dukong testnet..."
-    forge script script/UploadAllocations.s.sol:UploadAllocations \
-        --rpc-url $MANTRA_DUKONG_RPC_URL \
-        --private-key $PRIVATE_KEY \
+
+    echo "📤 Uploading allocations to {{NETWORK}}..."
+    NETWORK={{NETWORK}} forge script script/UploadAllocations.s.sol:UploadAllocations \
+        --rpc-url $RPC \
         --broadcast
     echo "✅ Allocations uploaded!"
 
-# Upload allocations to mainnet (requires .env with CLAIMDROP_ADDRESS and ALLOCATIONS_FILE)
-upload-allocations-mainnet:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    echo "⚠️  Uploading allocations to MAINNET - please confirm"
-    read -p "Continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Allocation upload cancelled"
-        exit 1
-    fi
-    echo "📤 Uploading allocations to MANTRA mainnet..."
-    forge script script/UploadAllocations.s.sol:UploadAllocations \
-        --rpc-url $MANTRA_MAINNET_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Allocations uploaded!"
+# Legacy aliases
+upload-allocations-local: (upload-allocations "local")
+upload-allocations-testnet: (upload-allocations "dukong")
+upload-allocations-mainnet: (upload-allocations "mainnet")
 
 # Run CI pipeline (format-check + lint + test-all)
 ci:
@@ -343,3 +383,93 @@ ci:
     @just format-check
     @just test-all
     @echo "✅ CI pipeline complete!"
+
+# =============================================================================
+# E2E Orchestration Commands
+# =============================================================================
+
+# Run full E2E orchestration on specified network
+e2e NETWORK:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _validate-network {{NETWORK}}
+    RPC=$(just _get-rpc {{NETWORK}})
+
+    # Mainnet safety check
+    if [ "{{NETWORK}}" = "mainnet" ]; then
+        echo "⚠️  Running E2E on MAINNET fork only (read-only)"
+        echo "This will NOT broadcast transactions"
+    fi
+
+    # Local network doesn't need PRIVATE_KEY
+    if [ "{{NETWORK}}" != "local" ]; then
+        just _check-private-key
+    fi
+
+    echo "🚀 Running E2E orchestration on {{NETWORK}}..."
+    echo ""
+    NETWORK={{NETWORK}} forge script script/e2e/E2EOrchestrator.s.sol:E2EOrchestrator \
+        --rpc-url $RPC \
+        --broadcast \
+        -vv
+    echo ""
+    echo "✅ E2E orchestration complete!"
+    echo "📊 Check report: out/e2e-report-{{NETWORK}}-*.md"
+    echo "💾 State saved: out/e2e-state-{{NETWORK}}.json"
+
+# Run E2E test contract (fast, local only)
+e2e-test:
+    @echo "🧪 Running E2E tests..."
+    @forge test --match-contract E2EClaimdrop -vv
+    @echo "✅ E2E tests complete!"
+
+# Run E2E tests on forked network (read-only, no gas cost)
+e2e-fork NETWORK:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _validate-network {{NETWORK}}
+    RPC=$(just _get-rpc {{NETWORK}})
+
+    echo "🔱 Running E2E tests on {{NETWORK}} fork..."
+    echo "This is read-only and will not broadcast transactions"
+    echo ""
+    forge test --match-contract E2EClaimdrop \
+        --fork-url $RPC \
+        -vv
+    echo ""
+    echo "✅ Fork tests complete!"
+
+# Legacy alias for e2e
+e2e-local: (e2e "local")
+e2e-testnet: (e2e "dukong")
+
+# Show E2E help and examples
+e2e-help:
+    @echo "E2E Orchestration Commands"
+    @echo ""
+    @echo "Commands:"
+    @echo "  just e2e <network>       - Run complete E2E lifecycle on network"
+    @echo "  just e2e-test            - Run E2E tests locally (fast)"
+    @echo "  just e2e-fork <network>  - Run E2E tests on forked network (read-only)"
+    @echo ""
+    @echo "Examples:"
+    @echo "  just e2e local           - Complete E2E on local Anvil (1-2 min)"
+    @echo "  just e2e dukong          - Complete E2E on DuKong testnet (1-2 hrs)"
+    @echo "  just e2e-test            - Fast E2E tests (< 30 sec)"
+    @echo "  just e2e-fork dukong     - Fork test on DuKong (no gas cost)"
+    @echo ""
+    @echo "What E2E Does:"
+    @echo "  1. ✅ Deploy Claimdrop contract"
+    @echo "  2. ✅ Create campaign with network-appropriate timing"
+    @echo "  3. ✅ Upload test allocations (10 users)"
+    @echo "  4. ✅ Wait for campaign start"
+    @echo "  5. ✅ Execute test claims"
+    @echo "  6. ✅ Close campaign"
+    @echo "  7. ✅ Validate all state"
+    @echo "  8. ✅ Generate report"
+    @echo ""
+    @echo "Output Files:"
+    @echo "  - out/e2e-state-{network}.json       - Execution state"
+    @echo "  - out/e2e-report-{network}-*.md      - Detailed report"
+    @echo ""
+    @echo "For more details, see README-MULTINETWORK.md"

@@ -14,15 +14,20 @@ via_ir = true
 # Gas reporting
 gas_reports = ["*"]
 
+# File system permissions for E2E tests
+fs_permissions = [{ access = "read", path = "./config" }, { access = "read-write", path = "./out" }]
+
 # RPC endpoints
 [rpc_endpoints]
 mantra_dukong = "${MANTRA_DUKONG_RPC_URL}"
+mantra_canary = "${MANTRA_CANARY_RPC_URL}"
 mantra_mainnet = "${MANTRA_MAINNET_RPC_URL}"
 localhost = "http://localhost:8545"
 
 # Etherscan configuration for verification (MANTRA Explorer does not require API key)
 [etherscan]
 mantra_dukong = { key = "", url = "https://evm.dukong.mantrachain.io/api" }
+mantra_canary = { key = "", url = "https://evm.canary.mantrachain.dev/api" }
 mantra_mainnet = { key = "", url = "https://evm.mantrachain.io/api" }
 
 [fmt]
