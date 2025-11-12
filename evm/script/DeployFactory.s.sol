@@ -2,13 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ClaimdropFactory} from "../contracts/ClaimdropFactory.sol";
+import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 /**
  * @title DeployFactory
- * @notice Deployment script for upgradeable ClaimdropFactory contract
+ * @notice Deployment script for upgradeable PrimarySaleClaimdropFactory contract
  * @dev Run with: forge script script/DeployFactory.s.sol:DeployFactory --rpc-url $RPC_URL --broadcast
  */
 contract DeployFactory is Script {
@@ -16,7 +16,7 @@ contract DeployFactory is Script {
         bool useLedger = vm.envExists("USE_LEDGER") && vm.envBool("USE_LEDGER");
         address deployer;
 
-        console.log("Deploying upgradeable ClaimdropFactory contract...");
+        console.log("Deploying upgradeable PrimarySaleClaimdropFactory contract...");
         if (useLedger) {
             deployer = vm.envAddress("LEDGER_ADDRESS");
             console.log("Using Ledger as deployer, address is ", deployer);
@@ -36,13 +36,13 @@ contract DeployFactory is Script {
         console.log("Deployer nonce:", nonce);
 
         // 1. Deploy the implementation contract
-        console.log("\n1. Deploying ClaimdropFactory implementation...");
-        ClaimdropFactory implementation = new ClaimdropFactory();
+        console.log("\n1. Deploying PrimarySaleClaimdropFactory implementation...");
+        PrimarySaleClaimdropFactory implementation = new PrimarySaleClaimdropFactory();
         console.log("Implementation deployed to:", address(implementation));
 
         // 2. Prepare initialization data
         bytes memory initData = abi.encodeCall(
-            ClaimdropFactory.initialize,
+            PrimarySaleClaimdropFactory.initialize,
             (deployer)
         );
 
@@ -66,7 +66,7 @@ contract DeployFactory is Script {
         console.log("========================================");
         console.log("Implementation:", address(implementation));
         console.log("ProxyAdmin:", address(proxyAdmin));
-        console.log("Proxy (ClaimdropFactory):", address(proxy));
+        console.log("Proxy (PrimarySaleClaimdropFactory):", address(proxy));
         console.log("Factory Owner:", deployer);
         console.log("========================================");
         console.log("Deployment complete!");

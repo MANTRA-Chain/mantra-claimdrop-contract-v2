@@ -7,12 +7,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Claimdrop} from "./Claimdrop.sol";
 
 /**
- * @title ClaimdropFactory
+ * @title PrimarySaleClaimdropFactory
  * @author MANTRA Finance
  * @notice Factory contract for deploying Claimdrop and PrimarySale contracts
  * @dev Manages deployment and tracking of Claimdrop instances and a single PrimarySale instance
  */
-contract ClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradeable {
+contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradeable {
     // ============ State Variables ============
 
     /// @notice Array of all deployed Claimdrop contracts

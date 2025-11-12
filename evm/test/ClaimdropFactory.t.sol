@@ -2,15 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {ClaimdropFactory} from "../contracts/ClaimdropFactory.sol";
+import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
 import {Claimdrop} from "../contracts/Claimdrop.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-contract ClaimdropFactoryTest is Test {
-    ClaimdropFactory public factory;
-    ClaimdropFactory public implementation;
+contract PrimarySaleClaimdropFactoryTest is Test {
+    PrimarySaleClaimdropFactory public factory;
+    PrimarySaleClaimdropFactory public implementation;
     TransparentUpgradeableProxy public proxy;
     ProxyAdmin public proxyAdmin;
     address public owner;
@@ -29,14 +29,14 @@ contract ClaimdropFactoryTest is Test {
         proxyAdminOwner = address(this);
 
         // Deploy the implementation contract
-        implementation = new ClaimdropFactory();
+        implementation = new PrimarySaleClaimdropFactory();
 
         // Deploy ProxyAdmin (no constructor args in newer versions)
         proxyAdmin = new ProxyAdmin();
 
         // Prepare initialization data
         bytes memory initData = abi.encodeWithSelector(
-            ClaimdropFactory.initialize.selector,
+            PrimarySaleClaimdropFactory.initialize.selector,
             owner
         );
 
@@ -48,7 +48,7 @@ contract ClaimdropFactoryTest is Test {
         );
 
         // Wrap the proxy in the factory interface
-        factory = ClaimdropFactory(address(proxy));
+        factory = PrimarySaleClaimdropFactory(address(proxy));
     }
 
     function testDeployClaimdrop() public {
@@ -170,7 +170,7 @@ contract ClaimdropFactoryTest is Test {
         assertEq(factory.getDeployedClaimdropsCount(), 1);
 
         // Deploy a new implementation
-        ClaimdropFactory newImplementation = new ClaimdropFactory();
+        PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
         // Upgrade the proxy to the new implementation
         proxyAdmin.upgrade(
@@ -189,7 +189,7 @@ contract ClaimdropFactoryTest is Test {
     }
 
     function testOnlyProxyAdminCanUpgrade() public {
-        ClaimdropFactory newImplementation = new ClaimdropFactory();
+        PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
         // User cannot upgrade
         vm.prank(user);
