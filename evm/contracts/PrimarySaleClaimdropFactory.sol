@@ -36,10 +36,12 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     // ============ Events ============
 
     /// @notice Emitted when a new Claimdrop is deployed
+    /// @param primarySaleAddress Address of the associated PrimarySale
     /// @param claimdropAddress Address of the newly deployed Claimdrop
     /// @param owner Owner of the Claimdrop (factory owner)
     /// @param index Index in the deployedClaimdrops array
     event ClaimdropDeployed(
+        address indexed primarySaleAddress,
         address indexed claimdropAddress,
         address indexed owner,
         uint256 index
@@ -53,10 +55,15 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         address indexed admin
     );
 
+    /// @notice Emitted when factory is reset
+    event FactoryReset();
+
     // ============ Errors ============
 
     error PrimarySaleAlreadyDeployed();
     error InvalidAddress();
+    error PrimarySaleNotSet();
+    error ResetNotAllowedOnMainnet();
 
     // ============ Constructor ============
 
@@ -88,8 +95,11 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
 
     /// @notice Deploy a new Claimdrop contract
     /// @dev Owner of the new Claimdrop will be the factory owner
+    /// @dev Requires PrimarySale to be set before deploying Claimdrops
     /// @return claimdropAddress Address of the newly deployed Claimdrop
     function deployClaimdrop() external onlyOwner whenNotPaused returns (address claimdropAddress) {
+        if (primarySale == address(0)) revert PrimarySaleNotSet();
+        
         // Deploy new Claimdrop with factory owner as the owner
         Claimdrop claimdrop = new Claimdrop(owner());
         claimdropAddress = address(claimdrop);
@@ -98,7 +108,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         deployedClaimdrops.push(claimdropAddress);
         isClaimdrop[claimdropAddress] = true;
 
-        emit ClaimdropDeployed(claimdropAddress, owner(), deployedClaimdrops.length - 1);
+        emit ClaimdropDeployed(primarySale, claimdropAddress, owner(), deployedClaimdrops.length - 1);
     }
 
     /// @notice Set the PrimarySale contract address (only one allowed)
@@ -157,6 +167,28 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         name = name_;
         slug = slug_;
         description = description_;
+    }
+
+    /// @notice Reset factory state for testing purposes
+    /// @dev Clears all deployed Claimdrops and resets PrimarySale
+    /// @dev Only callable on testnets - reverts on MANTRA Mainnet (chain ID 5888)
+    /// @dev WARNING: This is intended for testing only.
+    function resetFactory() external onlyOwner {
+        // Block reset on MANTRA Mainnet (chain ID 5888)
+        if (block.chainid == 5888) {
+            revert ResetNotAllowedOnMainnet();
+        }
+
+        // Clear all deployed claimdrops
+        for (uint256 i = 0; i < deployedClaimdrops.length; i++) {
+            delete isClaimdrop[deployedClaimdrops[i]];
+        }
+        delete deployedClaimdrops;
+
+        // Reset primary sale
+        primarySale = address(0);
+
+        emit FactoryReset();
     }
 
     // ============ Owner Functions ============
