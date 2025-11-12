@@ -2,22 +2,24 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {ClaimdropFactory} from "../contracts/ClaimdropFactory.sol";
+import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
 import {Claimdrop} from "../contracts/Claimdrop.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-contract ClaimdropFactoryTest is Test {
-    ClaimdropFactory public factory;
-    ClaimdropFactory public implementation;
+contract PrimarySaleClaimdropFactoryTest is Test {
+    PrimarySaleClaimdropFactory public factory;
+    PrimarySaleClaimdropFactory public implementation;
     TransparentUpgradeableProxy public proxy;
     ProxyAdmin public proxyAdmin;
     address public owner;
     address public user;
     address public proxyAdminOwner;
+    address public mockPrimarySale;
 
     event ClaimdropDeployed(
+        address indexed primarySaleAddress,
         address indexed claimdropAddress,
         address indexed owner,
         uint256 index
@@ -27,17 +29,21 @@ contract ClaimdropFactoryTest is Test {
         owner = address(this);
         user = address(0x1);
         proxyAdminOwner = address(this);
+        mockPrimarySale = address(0x999);
 
         // Deploy the implementation contract
-        implementation = new ClaimdropFactory();
+        implementation = new PrimarySaleClaimdropFactory();
 
         // Deploy ProxyAdmin (no constructor args in newer versions)
         proxyAdmin = new ProxyAdmin();
 
-        // Prepare initialization data
+        // Prepare initialization data with metadata
         bytes memory initData = abi.encodeWithSelector(
-            ClaimdropFactory.initialize.selector,
-            owner
+            PrimarySaleClaimdropFactory.initialize.selector,
+            owner,
+            "Test Factory",
+            "test-factory",
+            "Test factory for unit tests"
         );
 
         // Deploy the proxy
@@ -48,7 +54,10 @@ contract ClaimdropFactoryTest is Test {
         );
 
         // Wrap the proxy in the factory interface
-        factory = ClaimdropFactory(address(proxy));
+        factory = PrimarySaleClaimdropFactory(address(proxy));
+        
+        // Set mock PrimarySale address
+        factory.setPrimarySale(mockPrimarySale);
     }
 
     function testDeployClaimdrop() public {
@@ -118,8 +127,8 @@ contract ClaimdropFactoryTest is Test {
     }
 
     function testDeployClaimdropEmitsEvent() public {
-        vm.expectEmit(false, true, false, true);
-        emit ClaimdropDeployed(address(0), owner, 0);
+        vm.expectEmit(true, false, true, true);
+        emit ClaimdropDeployed(mockPrimarySale, address(0), owner, 0);
         factory.deployClaimdrop();
     }
 
@@ -161,7 +170,7 @@ contract ClaimdropFactoryTest is Test {
 
     function testCannotReinitialize() public {
         vm.expectRevert();
-        factory.initialize(user);
+        factory.initialize(user, "New Name", "new-slug", "New description");
     }
 
     function testUpgrade() public {
@@ -170,7 +179,7 @@ contract ClaimdropFactoryTest is Test {
         assertEq(factory.getDeployedClaimdropsCount(), 1);
 
         // Deploy a new implementation
-        ClaimdropFactory newImplementation = new ClaimdropFactory();
+        PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
         // Upgrade the proxy to the new implementation
         proxyAdmin.upgrade(
@@ -184,12 +193,12 @@ contract ClaimdropFactoryTest is Test {
         assertTrue(factory.isClaimdrop(claimdrop1));
 
         // Verify functionality still works
-        address claimdrop2 = factory.deployClaimdrop();
+        factory.deployClaimdrop();
         assertEq(factory.getDeployedClaimdropsCount(), 2);
     }
 
     function testOnlyProxyAdminCanUpgrade() public {
-        ClaimdropFactory newImplementation = new ClaimdropFactory();
+        PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
         // User cannot upgrade
         vm.prank(user);
@@ -200,7 +209,7 @@ contract ClaimdropFactoryTest is Test {
         );
     }
 
-    function testProxyAdminOwnership() public {
+    function testProxyAdminOwnership() public view {
         // Verify proxy admin owner
         assertEq(proxyAdmin.owner(), proxyAdminOwner);
     }
@@ -208,7 +217,117 @@ contract ClaimdropFactoryTest is Test {
     function testImplementationIsInitialized() public {
         // Try to initialize the implementation directly (should fail)
         vm.expectRevert();
-        implementation.initialize(user);
+        implementation.initialize(user, "Test", "test", "Test description");
+    }
+
+    function testMetadataFields() public view {
+        // Verify metadata is set correctly
+        assertEq(factory.name(), "Test Factory");
+        assertEq(factory.slug(), "test-factory");
+        assertEq(factory.description(), "Test factory for unit tests");
+    }
+
+    function testUpdateMetadata() public {
+        // Update metadata
+        factory.updateMetadata("New Name", "new-slug", "New description");
+
+        // Verify updated metadata
+        assertEq(factory.name(), "New Name");
+        assertEq(factory.slug(), "new-slug");
+        assertEq(factory.description(), "New description");
+    }
+
+    function testOnlyOwnerCanUpdateMetadata() public {
+        vm.prank(user);
+        vm.expectRevert();
+        factory.updateMetadata("Hacked", "hacked", "Hacked description");
+    }
+
+    function testCannotDeployClaimdropWithoutPrimarySale() public {
+        // Deploy a fresh factory without PrimarySale set
+        PrimarySaleClaimdropFactory freshImplementation = new PrimarySaleClaimdropFactory();
+        
+        bytes memory initData = abi.encodeWithSelector(
+            PrimarySaleClaimdropFactory.initialize.selector,
+            owner,
+            "Fresh Factory",
+            "fresh-factory",
+            "Fresh factory without PrimarySale"
+        );
+        
+        TransparentUpgradeableProxy freshProxy = new TransparentUpgradeableProxy(
+            address(freshImplementation),
+            address(proxyAdmin),
+            initData
+        );
+        
+        PrimarySaleClaimdropFactory freshFactory = PrimarySaleClaimdropFactory(address(freshProxy));
+        
+        // Should revert because PrimarySale is not set
+        vm.expectRevert(PrimarySaleClaimdropFactory.PrimarySaleNotSet.selector);
+        freshFactory.deployClaimdrop();
+    }
+
+    function testGetPrimarySale() public view {
+        assertEq(factory.getPrimarySale(), mockPrimarySale);
+    }
+
+    function testIsPrimarySaleDeployed() public view {
+        assertTrue(factory.isPrimarySaleDeployed());
+    }
+
+    function testResetFactory() public {
+        // Deploy some claimdrops
+        address claimdrop1 = factory.deployClaimdrop();
+        address claimdrop2 = factory.deployClaimdrop();
+        
+        // Verify state before reset
+        assertEq(factory.getDeployedClaimdropsCount(), 2);
+        assertTrue(factory.isClaimdrop(claimdrop1));
+        assertTrue(factory.isClaimdrop(claimdrop2));
+        assertEq(factory.getPrimarySale(), mockPrimarySale);
+        assertTrue(factory.isPrimarySaleDeployed());
+        
+        // Reset factory
+        factory.resetFactory();
+        
+        // Verify state after reset
+        assertEq(factory.getDeployedClaimdropsCount(), 0);
+        assertFalse(factory.isClaimdrop(claimdrop1));
+        assertFalse(factory.isClaimdrop(claimdrop2));
+        assertEq(factory.getPrimarySale(), address(0));
+        assertFalse(factory.isPrimarySaleDeployed());
+    }
+
+    function testOnlyOwnerCanResetFactory() public {
+        vm.prank(user);
+        vm.expectRevert();
+        factory.resetFactory();
+    }
+
+    function testCanDeployAfterReset() public {
+        // Deploy and reset
+        factory.deployClaimdrop();
+        factory.resetFactory();
+        
+        // Set new PrimarySale
+        address newPrimarySale = address(0x888);
+        factory.setPrimarySale(newPrimarySale);
+        
+        // Should be able to deploy again
+        address newClaimdrop = factory.deployClaimdrop();
+        assertTrue(newClaimdrop != address(0));
+        assertEq(factory.getDeployedClaimdropsCount(), 1);
+        assertEq(factory.getPrimarySale(), newPrimarySale);
+    }
+
+    function testResetNotAllowedOnMainnet() public {
+        // Simulate MANTRA mainnet (chain ID 5888)
+        vm.chainId(5888);
+        
+        // Should revert when trying to reset on mainnet
+        vm.expectRevert(PrimarySaleClaimdropFactory.ResetNotAllowedOnMainnet.selector);
+        factory.resetFactory();
     }
 }
 
