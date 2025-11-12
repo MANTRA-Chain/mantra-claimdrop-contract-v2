@@ -9,8 +9,8 @@ import {Claimdrop} from "./Claimdrop.sol";
 /**
  * @title ClaimdropFactory
  * @author MANTRA Finance
- * @notice Factory contract for deploying Claimdrop contracts
- * @dev Manages deployment and tracking of Claimdrop instances
+ * @notice Factory contract for deploying Claimdrop and PrimarySale contracts
+ * @dev Manages deployment and tracking of Claimdrop instances and a single PrimarySale instance
  */
 contract ClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradeable {
     // ============ State Variables ============
@@ -20,6 +20,9 @@ contract ClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradea
 
     /// @notice Mapping to check if an address is a deployed Claimdrop
     mapping(address => bool) public isClaimdrop;
+
+    /// @notice Address of the deployed PrimarySale contract (only one allowed)
+    address public primarySale;
 
     // ============ Events ============
 
@@ -32,6 +35,19 @@ contract ClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradea
         address indexed owner,
         uint256 index
     );
+
+    /// @notice Emitted when PrimarySale is deployed
+    /// @param primarySaleAddress Address of the newly deployed PrimarySale
+    /// @param admin Admin of the PrimarySale
+    event PrimarySaleSet(
+        address indexed primarySaleAddress,
+        address indexed admin
+    );
+
+    // ============ Errors ============
+
+    error PrimarySaleAlreadyDeployed();
+    error InvalidAddress();
 
     // ============ Constructor ============
 
@@ -64,6 +80,18 @@ contract ClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradea
         emit ClaimdropDeployed(claimdropAddress, owner(), deployedClaimdrops.length - 1);
     }
 
+    /// @notice Set the PrimarySale contract address (only one allowed)
+    /// @dev PrimarySale must be deployed externally to avoid contract size limits
+    /// @param primarySale_ Address of the deployed PrimarySale contract
+    function setPrimarySale(address primarySale_) external onlyOwner whenNotPaused {
+        if (primarySale != address(0)) revert PrimarySaleAlreadyDeployed();
+        if (primarySale_ == address(0)) revert InvalidAddress();
+
+        primarySale = primarySale_;
+
+        emit PrimarySaleSet(primarySale_, owner());
+    }
+
     /// @notice Get the total number of deployed Claimdrops
     /// @return count Total number of deployed Claimdrops
     function getDeployedClaimdropsCount() external view returns (uint256 count) {
@@ -82,6 +110,18 @@ contract ClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradea
     function getClaimdropAtIndex(uint256 index) external view returns (address claimdropAddress) {
         require(index < deployedClaimdrops.length, "Index out of bounds");
         return deployedClaimdrops[index];
+    }
+
+    /// @notice Get the deployed PrimarySale address
+    /// @return Address of the PrimarySale contract (address(0) if not deployed)
+    function getPrimarySale() external view returns (address) {
+        return primarySale;
+    }
+
+    /// @notice Check if PrimarySale has been deployed
+    /// @return True if PrimarySale exists
+    function isPrimarySaleDeployed() external view returns (bool) {
+        return primarySale != address(0);
     }
 
     // ============ Owner Functions ============
