@@ -15,6 +15,15 @@ import {Claimdrop} from "./Claimdrop.sol";
 contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, PausableUpgradeable {
     // ============ State Variables ============
 
+    /// @notice Human-readable name of the factory
+    string public name;
+
+    /// @notice URL-friendly identifier
+    string public slug;
+
+    /// @notice Description of the factory's purpose
+    string public description;
+
     /// @notice Array of all deployed Claimdrop contracts
     address[] public deployedClaimdrops;
 
@@ -58,9 +67,21 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
 
     /// @notice Initialize factory with owner
     /// @param initialOwner Address of the initial owner
-    function initialize(address initialOwner) public initializer {
+    /// @param name_ Human-readable name of the factory
+    /// @param slug_ URL-friendly identifier
+    /// @param description_ Description of the factory's purpose
+    function initialize(
+        address initialOwner,
+        string memory name_,
+        string memory slug_,
+        string memory description_
+    ) public initializer {
         __Ownable_init(initialOwner);
         __Pausable_init();
+        
+        name = name_;
+        slug = slug_;
+        description = description_;
     }
 
     // ============ External Functions ============
@@ -122,6 +143,20 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @return True if PrimarySale exists
     function isPrimarySaleDeployed() external view returns (bool) {
         return primarySale != address(0);
+    }
+
+    /// @notice Update factory metadata
+    /// @param name_ New name
+    /// @param slug_ New slug
+    /// @param description_ New description
+    function updateMetadata(
+        string memory name_,
+        string memory slug_,
+        string memory description_
+    ) external onlyOwner {
+        name = name_;
+        slug = slug_;
+        description = description_;
     }
 
     // ============ Owner Functions ============

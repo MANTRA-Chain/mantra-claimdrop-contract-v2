@@ -40,10 +40,14 @@ contract DeployFactory is Script {
         PrimarySaleClaimdropFactory implementation = new PrimarySaleClaimdropFactory();
         console.log("Implementation deployed to:", address(implementation));
 
-        // 2. Prepare initialization data
+        // 2. Prepare initialization data with metadata
+        string memory factoryName = "MANTRA Primary Sale & Claimdrop Factory";
+        string memory factorySlug = "mantra-factory";
+        string memory factoryDescription = "Factory for deploying and managing Claimdrop and PrimarySale contracts";
+        
         bytes memory initData = abi.encodeCall(
             PrimarySaleClaimdropFactory.initialize,
-            (deployer)
+            (deployer, factoryName, factorySlug, factoryDescription)
         );
 
         // 3. Deploy the TransparentUpgradeableProxy
@@ -68,6 +72,8 @@ contract DeployFactory is Script {
         console.log("ProxyAdmin:", address(proxyAdmin));
         console.log("Proxy (PrimarySaleClaimdropFactory):", address(proxy));
         console.log("Factory Owner:", deployer);
+        console.log("Factory Name:", factoryName);
+        console.log("Factory Slug:", factorySlug);
         console.log("========================================");
         console.log("Deployment complete!");
     }

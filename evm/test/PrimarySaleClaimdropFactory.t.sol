@@ -34,10 +34,13 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // Deploy ProxyAdmin (no constructor args in newer versions)
         proxyAdmin = new ProxyAdmin();
 
-        // Prepare initialization data
+        // Prepare initialization data with metadata
         bytes memory initData = abi.encodeWithSelector(
             PrimarySaleClaimdropFactory.initialize.selector,
-            owner
+            owner,
+            "Test Factory",
+            "test-factory",
+            "Test factory for unit tests"
         );
 
         // Deploy the proxy
@@ -161,7 +164,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
 
     function testCannotReinitialize() public {
         vm.expectRevert();
-        factory.initialize(user);
+        factory.initialize(user, "New Name", "new-slug", "New description");
     }
 
     function testUpgrade() public {
@@ -184,7 +187,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         assertTrue(factory.isClaimdrop(claimdrop1));
 
         // Verify functionality still works
-        address claimdrop2 = factory.deployClaimdrop();
+        factory.deployClaimdrop();
         assertEq(factory.getDeployedClaimdropsCount(), 2);
     }
 
@@ -200,7 +203,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         );
     }
 
-    function testProxyAdminOwnership() public {
+    function testProxyAdminOwnership() public view {
         // Verify proxy admin owner
         assertEq(proxyAdmin.owner(), proxyAdminOwner);
     }
@@ -208,7 +211,30 @@ contract PrimarySaleClaimdropFactoryTest is Test {
     function testImplementationIsInitialized() public {
         // Try to initialize the implementation directly (should fail)
         vm.expectRevert();
-        implementation.initialize(user);
+        implementation.initialize(user, "Test", "test", "Test description");
+    }
+
+    function testMetadataFields() public view {
+        // Verify metadata is set correctly
+        assertEq(factory.name(), "Test Factory");
+        assertEq(factory.slug(), "test-factory");
+        assertEq(factory.description(), "Test factory for unit tests");
+    }
+
+    function testUpdateMetadata() public {
+        // Update metadata
+        factory.updateMetadata("New Name", "new-slug", "New description");
+
+        // Verify updated metadata
+        assertEq(factory.name(), "New Name");
+        assertEq(factory.slug(), "new-slug");
+        assertEq(factory.description(), "New description");
+    }
+
+    function testOnlyOwnerCanUpdateMetadata() public {
+        vm.prank(user);
+        vm.expectRevert();
+        factory.updateMetadata("Hacked", "hacked", "Hacked description");
     }
 }
 
