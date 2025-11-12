@@ -426,6 +426,12 @@ wait_for_tx() {
     local timeout="${3:-$TX_CONFIRMATION_TIMEOUT}"
     local label="${4:-Transaction}"
 
+    # Enhanced validation is controlled by environment variables:
+    # - TX_VALIDATE_GAS: Enable gas usage validation (default: "1" = enabled)
+    # - TX_VALIDATE_CONFIRMATIONS: Required block confirmations (default: "1" = single block)
+    #
+    # These features are opt-in and non-blocking (warnings only, don't prevent success)
+
     # Validate transaction hash format before polling
     validate_transaction_hash "$tx_hash" "Transaction hash" || return 1
 
@@ -463,6 +469,28 @@ wait_for_tx() {
 
             if [ "$normalized_status" = "1" ]; then
                 log_debug "$label confirmed successfully (${elapsed}s)"
+
+                # Enhanced validation: Gas usage validation (opt-in, non-blocking)
+                local validate_gas="${TX_VALIDATE_GAS:-1}"
+                if [ "$validate_gas" != "0" ]; then
+                    local gas_used
+                    gas_used=$(echo "$receipt" | jq -r '.gasUsed // empty')
+                    if [ -n "$gas_used" ] && [ "$gas_used" != "null" ]; then
+                        # Validation errors are logged but don't prevent success
+                        validate_gas_usage "$gas_used" || log_debug "Gas validation encountered an issue (non-blocking)"
+                    fi
+                fi
+
+                # Enhanced validation: Block confirmation depth (opt-in, may fail)
+                local required_confirmations="${TX_VALIDATE_CONFIRMATIONS:-1}"
+                if [ "$required_confirmations" -gt 1 ]; then
+                    log_debug "Waiting for $required_confirmations confirmations..."
+                    if ! receipt=$(wait_for_confirmations "$tx_hash" "$rpc_url" "$required_confirmations" "$timeout" "$label"); then
+                        log_error "Failed to achieve required confirmations"
+                        return 1
+                    fi
+                fi
+
                 echo "$receipt"
                 return 0
             else
@@ -499,6 +527,260 @@ wait_for_tx() {
     log_error "$label confirmation timeout after ${timeout}s"
     log_error "Transaction may still be pending: $tx_hash"
     return 1
+}
+
+# ============================================================================
+# Enhanced Transaction Validation Functions
+# ============================================================================
+
+validate_gas_usage() {
+    local gas_used="$1"
+    local max_threshold="${2:-10000000}"  # Default: 10M gas
+
+    # Validate gas_used parameter is provided
+    if [ -z "$gas_used" ]; then
+        log_error "gas_used parameter is required"
+        return 1
+    fi
+
+    # Convert gas_used to decimal if in hex format
+    local gas_decimal
+    if [[ "$gas_used" =~ ^0x[0-9a-fA-F]+$ ]]; then
+        gas_decimal=$((gas_used))
+    elif [[ "$gas_used" =~ ^[0-9]+$ ]]; then
+        gas_decimal=$gas_used
+    else
+        log_error "Invalid gas format: $gas_used (expected decimal or hex)"
+        return 0  # Non-blocking: return success even on validation error
+    fi
+
+    # Format gas in human-readable form (K/M suffix)
+    local gas_formatted
+    if [ "$gas_decimal" -ge 1000000 ]; then
+        gas_formatted=$(echo "scale=1; $gas_decimal / 1000000" | bc)"M"
+    elif [ "$gas_decimal" -ge 1000 ]; then
+        gas_formatted=$(echo "scale=1; $gas_decimal / 1000" | bc)"K"
+    else
+        gas_formatted="$gas_decimal"
+    fi
+
+    # Log gas usage
+    log_info "Gas used: ${gas_formatted} (${gas_decimal} gas)"
+
+    # Check if gas exceeds threshold (warning only, non-blocking)
+    if [ "$gas_decimal" -gt "$max_threshold" ]; then
+        log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        log_warn "⚠️  Gas usage (${gas_formatted}) exceeds threshold ($(echo "scale=1; $max_threshold / 1000000" | bc)M)"
+        log_warn "⚠️  This may indicate inefficient code or unexpected behavior"
+        log_warn "⚠️  Consider reviewing the transaction for optimization opportunities"
+        log_warn "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    fi
+
+    # Always return success (non-blocking validation)
+    return 0
+}
+
+wait_for_confirmations() {
+    local tx_hash="$1"
+    local rpc_url="$2"
+    local required_confirmations="${3:-1}"
+    local timeout="${4:-300}"  # Default: 5 minutes
+    local label="${5:-Transaction}"
+
+    # Validate transaction hash format
+    validate_transaction_hash "$tx_hash" "Transaction hash" || return 1
+
+    # Validate required_confirmations is a positive integer
+    if ! [[ "$required_confirmations" =~ ^[0-9]+$ ]] || [ "$required_confirmations" -le 0 ]; then
+        log_error "Invalid confirmations value: $required_confirmations (must be positive integer)"
+        return 1
+    fi
+
+    log_debug "Waiting for $required_confirmations confirmation(s) for $label: $tx_hash"
+
+    # First, wait for transaction to be mined
+    local receipt
+    if ! receipt=$(cast receipt "$tx_hash" --rpc-url "$rpc_url" --json 2>/dev/null); then
+        log_error "$label not yet mined, waiting..."
+
+        # Poll for initial receipt
+        local elapsed=0
+        local interval=2
+        while [ $elapsed -lt $timeout ]; do
+            if receipt=$(cast receipt "$tx_hash" --rpc-url "$rpc_url" --json 2>/dev/null); then
+                break
+            fi
+            sleep $interval
+            elapsed=$((elapsed + interval))
+        done
+
+        if [ $elapsed -ge $timeout ]; then
+            log_error "$label not mined within timeout: ${timeout}s"
+            return 1
+        fi
+    fi
+
+    # Extract transaction block number
+    local tx_block
+    tx_block=$(echo "$receipt" | jq -r '.blockNumber // empty')
+
+    if [ -z "$tx_block" ]; then
+        log_error "Failed to extract block number from receipt"
+        return 1
+    fi
+
+    # Convert to decimal if hex
+    if [[ "$tx_block" =~ ^0x[0-9a-fA-F]+$ ]]; then
+        tx_block=$((tx_block))
+    fi
+
+    log_debug "$label mined in block: $tx_block"
+
+    # If only 1 confirmation required, we're done
+    if [ "$required_confirmations" -eq 1 ]; then
+        log_debug "$label has 1 confirmation"
+        echo "$receipt"
+        return 0
+    fi
+
+    # Poll for additional confirmations
+    local elapsed=0
+    local interval=2
+    local max_interval=10
+
+    while [ $elapsed -lt $timeout ]; do
+        # Get current block height
+        local current_block
+        if ! current_block=$(cast block-number --rpc-url "$rpc_url" 2>/dev/null); then
+            log_debug "Failed to query current block, retrying..."
+            sleep $interval
+            elapsed=$((elapsed + interval))
+            continue
+        fi
+
+        # Calculate confirmations: current_block - tx_block + 1
+        local confirmations=$((current_block - tx_block + 1))
+
+        log_debug "Waiting for confirmations... ($confirmations/$required_confirmations)"
+
+        # Check if we have enough confirmations
+        if [ "$confirmations" -ge "$required_confirmations" ]; then
+            log_debug "$label confirmed with $confirmations confirmations"
+            echo "$receipt"
+            return 0
+        fi
+
+        # Wait with exponential backoff
+        sleep $interval
+        elapsed=$((elapsed + interval))
+
+        # Increase interval up to max
+        if [ $interval -lt $max_interval ]; then
+            interval=$((interval + 2))
+            if [ $interval -gt $max_interval ]; then
+                interval=$max_interval
+            fi
+        fi
+    done
+
+    # Timeout reached
+    log_error "$label confirmation timeout after ${timeout}s"
+    log_error "Only $confirmations of $required_confirmations confirmations received"
+    return 1
+}
+
+log_tx_summary() {
+    local receipt="$1"
+    local description="${2:-Transaction}"
+    local explorer_base="${3:-}"  # Optional: explorer base URL (e.g., "https://mantrascan.io/dukong/tx")
+
+    # Validate receipt is not empty
+    if [ -z "$receipt" ]; then
+        log_error "Receipt is empty, cannot generate summary"
+        return 1
+    fi
+
+    # Parse receipt fields with defaults for missing values
+    local tx_hash
+    tx_hash=$(echo "$receipt" | jq -r '.transactionHash // empty')
+    if [ -z "$tx_hash" ]; then
+        log_warn "Transaction hash missing from receipt"
+        tx_hash="unknown"
+    fi
+
+    local block_number
+    block_number=$(echo "$receipt" | jq -r '.blockNumber // empty')
+    if [ -z "$block_number" ] || [ "$block_number" = "null" ]; then
+        block_number="unknown"
+    elif [[ "$block_number" =~ ^0x[0-9a-fA-F]+$ ]]; then
+        # Convert hex to decimal for readability
+        block_number=$((block_number))
+    fi
+
+    local gas_used
+    gas_used=$(echo "$receipt" | jq -r '.gasUsed // empty')
+    if [ -z "$gas_used" ] || [ "$gas_used" = "null" ]; then
+        gas_used="unknown"
+    else
+        # Convert to decimal and format
+        local gas_decimal
+        if [[ "$gas_used" =~ ^0x[0-9a-fA-F]+$ ]]; then
+            gas_decimal=$((gas_used))
+        else
+            gas_decimal=$gas_used
+        fi
+
+        # Format with K/M suffix
+        if [ "$gas_decimal" != "unknown" ] && [ "$gas_decimal" -ge 1000000 ]; then
+            gas_used="$(echo "scale=2; $gas_decimal / 1000000" | bc)M (${gas_decimal})"
+        elif [ "$gas_decimal" != "unknown" ] && [ "$gas_decimal" -ge 1000 ]; then
+            gas_used="$(echo "scale=2; $gas_decimal / 1000" | bc)K (${gas_decimal})"
+        else
+            gas_used="$gas_decimal"
+        fi
+    fi
+
+    local status
+    status=$(echo "$receipt" | jq -r '.status // empty')
+    local status_symbol="❓"
+    if [ -n "$status" ] && [ "$status" != "null" ]; then
+        local normalized_status
+        if [[ "$status" =~ ^0x[0-9a-fA-F]+$ ]]; then
+            normalized_status=$((status))
+        else
+            normalized_status=$status
+        fi
+
+        if [ "$normalized_status" = "1" ]; then
+            status_symbol="✅"
+        elif [ "$normalized_status" = "0" ]; then
+            status_symbol="❌"
+        fi
+    fi
+
+    local event_count
+    event_count=$(echo "$receipt" | jq -r '.logs | length' 2>/dev/null || echo "0")
+
+    # Display formatted summary
+    echo ""
+    log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_info "📋 Transaction Summary: $description"
+    log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    log_info "Status:       $status_symbol"
+    log_info "TX Hash:      $tx_hash"
+    log_info "Block:        $block_number"
+    log_info "Gas Used:     $gas_used"
+    log_info "Events:       $event_count"
+
+    # Add explorer link if provided
+    if [ -n "$explorer_base" ] && [ "$tx_hash" != "unknown" ]; then
+        log_info "Explorer:     $explorer_base/$tx_hash"
+    fi
+
+    log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    return 0
 }
 
 send_tx() {

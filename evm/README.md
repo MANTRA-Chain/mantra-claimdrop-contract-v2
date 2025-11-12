@@ -91,7 +91,22 @@ just e2e-report       # View E2E transaction report
 
 ## Production-Grade Cast Scripts
 
-The EVM implementation includes **production-hardened cast-based deployment scripts** designed for reliability on Cosmos SDK EVM chains (MANTRA DuKong, mainnet). These scripts solve the nonce management issues that occur with `forge script` batch broadcasting on Cosmos SDK EVMs.
+**⚠️ IMPORTANT: Cast scripts are the preferred deployment method for this project.**
+
+The EVM implementation includes **production-hardened cast-based deployment scripts** designed for reliability on Cosmos SDK EVM chains (MANTRA DuKong, mainnet). These scripts are the **recommended and actively maintained** deployment approach.
+
+### Why Cast Scripts Are Preferred
+
+Cast scripts solve critical issues with `forge script` batch broadcasting on Cosmos SDK EVMs:
+- **Nonce Management**: Sequential transaction handling prevents nonce conflicts
+- **Cosmos SDK Compatibility**: Works reliably on MANTRA chains (DuKong testnet, mainnet)
+- **Production Reliability**: Proven deployment success on testnet (see E2E-DUKONG-REPORT.md)
+- **Enhanced Error Handling**: Comprehensive validation and transaction confirmation
+
+**When to use forge vs cast:**
+- ✅ **Use cast scripts for deployment**: `just deploy <network>` (production deployments)
+- ✅ **Use forge for testing/simulations**: `forge test`, `forge script --no-broadcast` (development)
+- ❌ **Do NOT use forge script for actual deployments**: Causes nonce management issues on Cosmos SDK EVMs
 
 ### Key Features
 
@@ -107,6 +122,10 @@ The EVM implementation includes **production-hardened cast-based deployment scri
 - Configurable timeout (default: 180 seconds)
 - Transaction status validation (detects failed transactions)
 - Revert reason extraction from failed transactions
+- **Enhanced validation features** (opt-in):
+  - Gas usage validation with warnings for excessive consumption
+  - Multi-block confirmation depth support for critical transactions
+  - Transaction summary logging with explorer links
 
 **💰 Dynamic Gas Pricing**:
 - Network gas price estimation via `cast gas-price`
@@ -149,6 +168,10 @@ GAS_LIMIT=10000000              # Gas limit for transactions (default: 10000000)
 
 # Transaction Settings (optional)
 TX_CONFIRMATION_TIMEOUT=180     # Confirmation timeout in seconds (default: 180)
+
+# Enhanced Validation (optional)
+TX_VALIDATE_GAS=1               # Enable gas usage validation (default: 1)
+TX_VALIDATE_CONFIRMATIONS=1     # Required block confirmations (default: 1, set higher for critical txs)
 
 # Campaign Timing (optional)
 CAMPAIGN_START_BUFFER=30        # Safety buffer after campaign creation (default: 30)

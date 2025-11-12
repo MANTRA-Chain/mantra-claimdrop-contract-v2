@@ -146,7 +146,19 @@ networks:
 # Unified Multi-Network Commands
 # =============================================================================
 
-# Deploy Claimdrop contract to specified network
+# Deploy Claimdrop contract to specified network using production-grade cast scripts
+#
+# Architecture Decision:
+# This recipe uses cast-based deployment (./scripts/cast-deploy.sh) instead of forge scripts
+# because cast provides sequential transaction handling that works reliably on Cosmos SDK EVMs
+# (MANTRA chains). Forge script batch broadcasting has nonce management issues on these chains.
+#
+# The cast scripts provide:
+# - Sequential deployment with explicit nonce management
+# - Comprehensive error handling and validation
+# - Production-grade transaction confirmation
+# - Enhanced security checks and logging
+#
 deploy NETWORK:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -169,10 +181,17 @@ deploy NETWORK:
         just _check-private-key
     fi
 
-    echo "🚀 Deploying to {{NETWORK}}..."
-    NETWORK={{NETWORK}} forge script script/Deploy.s.sol:Deploy \
-        --rpc-url $RPC \
-        --broadcast
+    # Load .env file if it exists (cast-deploy.sh will validate environment)
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+    fi
+
+    echo "🚀 Deploying to {{NETWORK}} using cast scripts..."
+    export RPC_URL="$RPC"
+    export NETWORK={{NETWORK}}
+    ./scripts/cast-deploy.sh
     echo "✅ Deployment complete!"
 
 # Legacy aliases (backward compatibility)
