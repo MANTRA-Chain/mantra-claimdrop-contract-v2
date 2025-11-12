@@ -2,13 +2,13 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ClaimdropFactory} from "../contracts/ClaimdropFactory.sol";
+import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 /**
  * @title UpgradeFactory
- * @notice Upgrade script for ClaimdropFactory contract
+ * @notice Upgrade script for PrimarySaleClaimdropFactory contract
  * @dev Run with: forge script script/UpgradeFactory.s.sol:UpgradeFactory --rpc-url $RPC_URL --broadcast
  *
  * Required environment variables:
@@ -16,12 +16,12 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
  * - PROXY_ADMIN_ADDRESS: Address of the ProxyAdmin
  */
 contract UpgradeFactory is Script {
-    function run() external returns (ClaimdropFactory) {
+    function run() external returns (PrimarySaleClaimdropFactory) {
         // Get required addresses from environment
         address proxyAddress = vm.envAddress("PROXY_ADDRESS");
         address proxyAdminAddress = vm.envAddress("PROXY_ADMIN_ADDRESS");
 
-        console.log("Upgrading ClaimdropFactory...");
+        console.log("Upgrading PrimarySaleClaimdropFactory...");
         console.log("Proxy address:", proxyAddress);
         console.log("ProxyAdmin address:", proxyAdminAddress);
 
@@ -44,8 +44,8 @@ contract UpgradeFactory is Script {
         console.log("Deployer balance:", (balance / 1e18), ".", (balance % 1e18));
 
         // 1. Deploy the new implementation
-        console.log("\n1. Deploying new ClaimdropFactory implementation...");
-        ClaimdropFactory newImplementation = new ClaimdropFactory();
+        console.log("\n1. Deploying new PrimarySaleClaimdropFactory implementation...");
+        PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
         console.log("New implementation deployed to:", address(newImplementation));
 
         // 2. Upgrade the proxy
@@ -58,7 +58,7 @@ contract UpgradeFactory is Script {
         console.log("Proxy upgraded successfully!");
 
         // 3. Verify the upgrade
-        ClaimdropFactory factory = ClaimdropFactory(proxyAddress);
+        PrimarySaleClaimdropFactory factory = PrimarySaleClaimdropFactory(proxyAddress);
         console.log("\n3. Verifying upgrade...");
         console.log("Factory owner:", factory.owner());
         console.log("Deployed claimdrops count:", factory.getDeployedClaimdropsCount());
