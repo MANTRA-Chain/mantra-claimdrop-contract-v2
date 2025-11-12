@@ -5,7 +5,7 @@ libs = ["lib"]
 test = "test"
 script = "script"
 
-# Compiler settings (matching Hardhat config)
+# Compiler settings
 solc = "0.8.24"
 optimizer = true
 optimizer_runs = 200

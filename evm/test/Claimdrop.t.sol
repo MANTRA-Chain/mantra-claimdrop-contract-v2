@@ -8,7 +8,6 @@ import {MockERC20} from "../contracts/mocks/MockERC20.sol";
 /**
  * @title ClaimdropTest
  * @notice Comprehensive test suite for Claimdrop contract
- * @dev Ported from JavaScript (Hardhat) to Solidity (Foundry)
  */
 contract ClaimdropTest is Test {
     // Contracts

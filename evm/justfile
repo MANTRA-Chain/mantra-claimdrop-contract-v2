@@ -10,7 +10,8 @@
 # Examples:
 #   just deploy local          # Deploy to local Anvil
 #   just deploy dukong         # Deploy to DuKong testnet
-#   just e2e dukong            # Run full E2E suite on DuKong
+#   just e2e                   # Deploy + run E2E test on DuKong
+#   just e2e mainnet           # Deploy + run E2E test on mainnet
 #   just networks              # List all available networks
 
 # Default recipe - show available commands
@@ -56,6 +57,13 @@ format-check:
 lint:
     @echo "🔍 Linting contracts..."
     @solhint 'contracts/**/*.sol' || echo "⚠️  Install solhint globally: npm install -g solhint"
+
+# Lint shell scripts with ShellCheck
+lint-scripts:
+    @echo "🔍 Linting shell scripts..."
+    @command -v shellcheck >/dev/null 2>&1 || { echo "❌ shellcheck not installed. Install: brew install shellcheck"; exit 1; }
+    @shellcheck scripts/*.sh scripts/lib/*.sh
+    @echo "✅ Shell scripts are clean!"
 
 # Clean build artifacts
 clean:
@@ -309,113 +317,17 @@ verify CONTRACT_ADDRESS CHAIN="mantradukong":
         --watch
     echo "✅ Verification complete!"
 
-# Create campaign on specified network
-create-campaign NETWORK:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    just _validate-network {{NETWORK}}
-    RPC=$(just _get-rpc {{NETWORK}})
-
-    # Mainnet safety check
-    if [ "{{NETWORK}}" = "mainnet" ]; then
-        echo "⚠️  Creating campaign on MAINNET - please confirm"
-        read -p "Continue? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "Campaign creation cancelled"
-            exit 1
-        fi
-    fi
-
-    # Local network doesn't need PRIVATE_KEY
-    if [ "{{NETWORK}}" != "local" ]; then
-        just _check-private-key
-    fi
-
-    echo "📋 Creating campaign on {{NETWORK}}..."
-    NETWORK={{NETWORK}} forge script script/CreateCampaign.s.sol:CreateCampaign \
-        --rpc-url $RPC \
-        --broadcast
-    echo "✅ Campaign created!"
-
-# Legacy aliases
-create-campaign-local: (create-campaign "local")
-create-campaign-testnet: (create-campaign "dukong")
-create-campaign-mainnet: (create-campaign "mainnet")
-
-# Upload allocations to specified network
-upload-allocations NETWORK:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    just _validate-network {{NETWORK}}
-    RPC=$(just _get-rpc {{NETWORK}})
-
-    # Mainnet safety check
-    if [ "{{NETWORK}}" = "mainnet" ]; then
-        echo "⚠️  Uploading allocations to MAINNET - please confirm"
-        read -p "Continue? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            echo "Allocation upload cancelled"
-            exit 1
-        fi
-    fi
-
-    # Local network doesn't need PRIVATE_KEY
-    if [ "{{NETWORK}}" != "local" ]; then
-        just _check-private-key
-    fi
-
-    echo "📤 Uploading allocations to {{NETWORK}}..."
-    NETWORK={{NETWORK}} forge script script/UploadAllocations.s.sol:UploadAllocations \
-        --rpc-url $RPC \
-        --broadcast
-    echo "✅ Allocations uploaded!"
-
-# Legacy aliases
-upload-allocations-local: (upload-allocations "local")
-upload-allocations-testnet: (upload-allocations "dukong")
-upload-allocations-mainnet: (upload-allocations "mainnet")
-
-# Run CI pipeline (format-check + lint + test-all)
+# Run CI pipeline (format-check + lint + lint-scripts + test-all)
 ci:
     @echo "🚀 Running CI pipeline..."
     @just format-check
+    @just lint-scripts
     @just test-all
     @echo "✅ CI pipeline complete!"
 
 # =============================================================================
-# E2E Orchestration Commands
+# E2E Testing (Fast, Local)
 # =============================================================================
-
-# Run full E2E orchestration on specified network
-e2e NETWORK:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    just _validate-network {{NETWORK}}
-    RPC=$(just _get-rpc {{NETWORK}})
-
-    # Mainnet safety check
-    if [ "{{NETWORK}}" = "mainnet" ]; then
-        echo "⚠️  Running E2E on MAINNET fork only (read-only)"
-        echo "This will NOT broadcast transactions"
-    fi
-
-    # Local network doesn't need PRIVATE_KEY
-    if [ "{{NETWORK}}" != "local" ]; then
-        just _check-private-key
-    fi
-
-    echo "🚀 Running E2E orchestration on {{NETWORK}}..."
-    echo ""
-    NETWORK={{NETWORK}} forge script script/e2e/E2EOrchestrator.s.sol:E2EOrchestrator \
-        --rpc-url $RPC \
-        --broadcast \
-        -vv
-    echo ""
-    echo "✅ E2E orchestration complete!"
-    echo "📊 Check report: out/e2e-report-{{NETWORK}}-*.md"
-    echo "💾 State saved: out/e2e-state-{{NETWORK}}.json"
 
 # Run E2E test contract (fast, local only)
 e2e-test:
@@ -439,37 +351,436 @@ e2e-fork NETWORK:
     echo ""
     echo "✅ Fork tests complete!"
 
-# Legacy alias for e2e
-e2e-local: (e2e "local")
-e2e-testnet: (e2e "dukong")
+# =============================================================================
+# Pure Cast E2E Integration Testing (Cosmos SDK EVM Compatible)
+# =============================================================================
+#
+# Pure bash+just+cast orchestration for testnet integration testing.
+# No forge scripts in critical path - all transactions use cast send.
+#
+# Architecture:
+# - `cast send --create` for contract deployment
+# - `cast send` with inline ABI encoding for all contract interactions
+# - deployments.txt for state persistence across phases
+#
+# Benefits:
+# - Cosmos SDK EVM compatible (sequential transactions)
+# - Easy debugging (transparent bash orchestration)
+# - No temporary file pollution
+# - Complex struct arrays handled natively by modern cast
+#
+# Usage:
+#   just e2e                        # Deploy + run comprehensive E2E test on dukong
+#   just e2e mainnet                # Deploy + run comprehensive E2E test on mainnet
+#   just e2e-deploy                 # Deploy contracts only (use with individual phases)
+#   just e2e-setup                  # Create campaign and allocations (pure cast)
+#   just e2e-execute                # Execute test claims (pure cast)
+#   just e2e-close                  # Close campaign (pure cast)
+#   just e2e-basic                  # Run 4 basic phases with dummy addresses
+#
 
-# Show E2E help and examples
+# Main entry point: Comprehensive E2E test (always deploys fresh contracts)
+# Usage:
+#   just e2e              - Deploy + run E2E test on dukong (default)
+#   just e2e mainnet      - Deploy + run E2E test on mainnet
+#
+# Note: This test ALWAYS deploys fresh contracts because:
+# - It generates new temporary test addresses
+# - The Claimdrop contract only allows ONE campaign per deployment
+# - Therefore, each test run needs fresh contracts
+e2e network="dukong":
+    #!/usr/bin/env bash
+    set -e
+
+    echo ""
+    echo "=========================================="
+    echo "  Comprehensive E2E Test"
+    echo "  Network: {{network}}"
+    echo "=========================================="
+    echo ""
+
+    # Load environment first
+    if [ ! -f .env ]; then
+        echo "❌ Error: .env file not found"
+        echo "Copy .env.example to .env and configure"
+        exit 1
+    fi
+
+    set -a
+    source .env
+    set +a
+
+    # Validate network and set RPC_URL
+    case "{{network}}" in
+        dukong|testnet)
+            export RPC_URL="${MANTRA_DUKONG_RPC_URL:?MANTRA_DUKONG_RPC_URL not set in .env}"
+            echo "✓ Using DuKong testnet"
+            ;;
+        mainnet)
+            export RPC_URL="${MANTRA_MAINNET_RPC_URL:?MANTRA_MAINNET_RPC_URL not set in .env}"
+            echo "✓ Using MANTRA mainnet"
+            echo "⚠️  WARNING: Running on mainnet!"
+            read -p "Are you sure? (yes/no): " confirm
+            if [ "$confirm" != "yes" ]; then
+                echo "Aborted."
+                exit 1
+            fi
+            ;;
+        *)
+            echo "❌ Unknown network: {{network}}"
+            echo "Valid networks: dukong, testnet, mainnet"
+            exit 1
+            ;;
+    esac
+
+    # Validate required vars
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set in .env"
+        exit 1
+    fi
+
+    echo ""
+    echo "Running comprehensive E2E workflow..."
+    echo "(Deploys fresh contracts + creates funded test addresses)"
+    echo ""
+
+    # Deploy fresh contracts
+    just e2e-deploy
+
+    # Run comprehensive E2E test with funded addresses
+    echo ""
+    echo "🚀 Running comprehensive E2E test..."
+    echo ""
+    ./scripts/cast-e2e-complete.sh
+
+    echo ""
+    echo "=========================================="
+    echo "  ✅ E2E Test Complete"
+    echo "  Network: {{network}}"
+    echo "=========================================="
+    echo ""
+
+# Phase 1: Deploy contracts using cast send (sequential, nonce-managed)
+e2e-deploy:
+    #!/usr/bin/env bash
+    set -e
+
+    # Load environment from .env if it exists
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+    fi
+
+    # Validate environment
+    if [ -z "${RPC_URL:-}" ]; then
+        echo "❌ Error: RPC_URL not set"
+        echo "Set RPC_URL in .env or environment"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        echo "Set PRIVATE_KEY in .env or environment"
+        exit 1
+    fi
+
+    echo ""
+    echo "🚀 Phase 1: Deploy contracts using cast send..."
+    echo ""
+
+    # Run cast-based deployment
+    GAS_PRICE="${GAS_PRICE:-50000000000}"
+    export RPC_URL PRIVATE_KEY GAS_PRICE
+    ./scripts/cast-deploy.sh
+
+    echo ""
+    echo "✅ Phase 1 Complete!"
+
+# Phase 2: Setup campaign and add allocations (pure cast)
+e2e-setup:
+    #!/usr/bin/env bash
+    set -e
+
+    # Check deployments.txt exists
+    if [ ! -f deployments.txt ]; then
+        echo "❌ Error: deployments.txt not found"
+        echo "Run 'just e2e-deploy' first"
+        exit 1
+    fi
+
+    echo ""
+    echo "📋 Phase 2: Setup campaign and add allocations..."
+    echo ""
+
+    # Load .env first, then deployment state (skip comment lines)
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+    fi
+    export $(grep -v '^#' deployments.txt | xargs)
+
+    # Validate environment
+    if [ -z "${RPC_URL:-}" ]; then
+        echo "❌ Error: RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    if [ -z "${CLAIMDROP:-}" ]; then
+        echo "❌ Error: CLAIMDROP address not found in deployments.txt"
+        exit 1
+    fi
+
+    # Run pure cast setup script (no forge scripts, pure cast send)
+    ./scripts/cast-setup.sh
+
+    echo ""
+    echo "✅ Phase 2 Complete!"
+
+# Phase 3: Execute test claims
+e2e-execute:
+    #!/usr/bin/env bash
+    set -e
+
+    # Check deployments.txt exists
+    if [ ! -f deployments.txt ]; then
+        echo "❌ Error: deployments.txt not found"
+        echo "Run 'just e2e-deploy' first"
+        exit 1
+    fi
+
+    echo ""
+    echo "💰 Phase 3: Execute test claims..."
+    echo ""
+
+    # Load .env first, then deployment state (skip comment lines)
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+    fi
+    export $(grep -v '^#' deployments.txt | xargs)
+
+    # Validate environment
+    if [ -z "${RPC_URL:-}" ]; then
+        echo "❌ Error: RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    if [ -z "${CLAIMDROP:-}" ]; then
+        echo "❌ Error: CLAIMDROP address not found in deployments.txt"
+        exit 1
+    fi
+
+    # Run pure cast claims execution script
+    ./scripts/cast-execute-claims.sh
+
+    echo ""
+    echo "✅ Phase 3 Complete!"
+
+# Phase 4: Close campaign
+e2e-close:
+    #!/usr/bin/env bash
+    set -e
+
+    # Check deployments.txt exists
+    if [ ! -f deployments.txt ]; then
+        echo "❌ Error: deployments.txt not found"
+        echo "Run 'just e2e-deploy' first"
+        exit 1
+    fi
+
+    echo ""
+    echo "🏁 Phase 4: Close campaign..."
+    echo ""
+
+    # Load .env first, then deployment state (skip comment lines)
+    if [ -f .env ]; then
+        set -a
+        source .env
+        set +a
+    fi
+    export $(grep -v '^#' deployments.txt | xargs)
+
+    # Validate environment
+    if [ -z "${RPC_URL:-}" ]; then
+        echo "❌ Error: RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    if [ -z "${CLAIMDROP:-}" ]; then
+        echo "❌ Error: CLAIMDROP address not found in deployments.txt"
+        exit 1
+    fi
+
+    # Run pure cast close campaign script
+    ./scripts/cast-close-campaign.sh
+
+    echo ""
+    echo "✅ Phase 4 Complete!"
+
+# Basic E2E flow: Deploy → Setup → Execute → Close (with dummy addresses)
+e2e-basic:
+    #!/usr/bin/env bash
+    set -e
+
+    echo ""
+    echo "=========================================="
+    echo "  Basic E2E Integration Test Suite"
+    echo "=========================================="
+    echo ""
+    echo "This runs all 4 phases of the E2E workflow:"
+    echo "  1. Deploy contracts (cast send)"
+    echo "  2. Setup campaign (pure cast send)"
+    echo "  3. Execute claims (pure cast send)"
+    echo "  4. Close campaign (pure cast send)"
+    echo ""
+
+    just e2e-deploy
+    just e2e-setup
+    just e2e-execute
+    just e2e-close
+
+    echo ""
+    echo "=========================================="
+    echo "  ✅ E2E Test Complete!"
+    echo "=========================================="
+    echo ""
+    echo "Test completed successfully!"
+    echo "Contract addresses saved in: deployments.txt"
+    echo ""
+
+# Generate formatted report from e2e-report.txt with Mantrascan links
+e2e-report:
+    #!/usr/bin/env bash
+    set -e
+
+    REPORT_FILE="e2e-report.txt"
+
+    if [ ! -f "$REPORT_FILE" ]; then
+        echo "❌ Error: $REPORT_FILE not found"
+        echo ""
+        echo "Run 'just e2e' first to generate the report"
+        exit 1
+    fi
+
+    echo ""
+    echo "=========================================="
+    echo "  E2E Test Transaction Report"
+    echo "=========================================="
+    echo ""
+
+    # Determine network from RPC URL
+    NETWORK_LINE=$(grep "^NETWORK|" "$REPORT_FILE" | cut -d'|' -f2)
+    EXPLORER_BASE=""
+    NETWORK_NAME=""
+
+    if [[ "$NETWORK_LINE" == *"dukong"* ]]; then
+        EXPLORER_BASE="https://mantrascan.io/dukong/tx"
+        NETWORK_NAME="DuKong Testnet"
+    elif [[ "$NETWORK_LINE" == *"mantrachain.io"* ]]; then
+        EXPLORER_BASE="https://www.mantrascan.io/tx"
+        NETWORK_NAME="MANTRA Mainnet"
+    else
+        EXPLORER_BASE="https://mantrascan.io/dukong/tx"
+        NETWORK_NAME="Unknown Network"
+    fi
+
+    echo "Network: $NETWORK_NAME"
+    echo ""
+
+    # Show contract addresses
+    echo "📝 Deployed Contracts:"
+    echo "─────────────────────────────────────────"
+    DEPLOYER=$(grep "^DEPLOYER|" "$REPORT_FILE" | cut -d'|' -f2)
+    CLAIMDROP=$(grep "^CLAIMDROP|" "$REPORT_FILE" | cut -d'|' -f2)
+    MOCKERC20=$(grep "^MOCKERC20|" "$REPORT_FILE" | cut -d'|' -f2)
+    echo "Deployer:  $DEPLOYER"
+    echo "Claimdrop: $CLAIMDROP"
+    echo "MockERC20: $MOCKERC20"
+    echo ""
+
+    # Show transactions
+    echo "📊 Transactions:"
+    echo "─────────────────────────────────────────"
+
+    # Read and format transactions
+    while IFS='|' read -r label tx_hash; do
+        # Skip metadata lines
+        if [[ "$label" == "NETWORK" ]] || [[ "$label" == "DEPLOYER" ]] || \
+           [[ "$label" == "CLAIMDROP" ]] || [[ "$label" == "MOCKERC20" ]] || \
+           [[ "$label" == "SEPARATOR" ]]; then
+            continue
+        fi
+
+        if [ -n "$tx_hash" ]; then
+            echo ""
+            echo "✓ $label"
+            echo "  TX: $tx_hash"
+            echo "  🔗 $EXPLORER_BASE/$tx_hash"
+        fi
+    done < "$REPORT_FILE"
+
+    echo ""
+    echo "=========================================="
+    echo ""
+    echo "Report file: $REPORT_FILE"
+    echo ""
+
+# Show E2E help
 e2e-help:
-    @echo "E2E Orchestration Commands"
+    @echo "Pure Cast E2E Integration Testing"
     @echo ""
-    @echo "Commands:"
-    @echo "  just e2e <network>       - Run complete E2E lifecycle on network"
-    @echo "  just e2e-test            - Run E2E tests locally (fast)"
-    @echo "  just e2e-fork <network>  - Run E2E tests on forked network (read-only)"
+    @echo "Main Command:"
+    @echo "  just e2e                 - Deploy + run comprehensive E2E test on dukong"
+    @echo "  just e2e mainnet         - Deploy + run comprehensive E2E test on mainnet"
     @echo ""
-    @echo "Examples:"
-    @echo "  just e2e local           - Complete E2E on local Anvil (1-2 min)"
-    @echo "  just e2e dukong          - Complete E2E on DuKong testnet (1-2 hrs)"
-    @echo "  just e2e-test            - Fast E2E tests (< 30 sec)"
-    @echo "  just e2e-fork dukong     - Fork test on DuKong (no gas cost)"
+    @echo "What it does:"
+    @echo "  - Deploys fresh contracts (MockERC20 + Claimdrop)"
+    @echo "  - Generates 3 temporary test addresses"
+    @echo "  - Funds them with OM for gas"
+    @echo "  - Creates campaign and adds allocations"
+    @echo "  - Executes claims from test users"
+    @echo "  - Verifies balances"
+    @echo "  - Sweeps remaining OM back to deployer"
     @echo ""
-    @echo "What E2E Does:"
-    @echo "  1. ✅ Deploy Claimdrop contract"
-    @echo "  2. ✅ Create campaign with network-appropriate timing"
-    @echo "  3. ✅ Upload test allocations (10 users)"
-    @echo "  4. ✅ Wait for campaign start"
-    @echo "  5. ✅ Execute test claims"
-    @echo "  6. ✅ Close campaign"
-    @echo "  7. ✅ Validate all state"
-    @echo "  8. ✅ Generate report"
+    @echo "Report:"
+    @echo "  just e2e-report          - View formatted transaction report with Mantrascan links"
     @echo ""
-    @echo "Output Files:"
-    @echo "  - out/e2e-state-{network}.json       - Execution state"
-    @echo "  - out/e2e-report-{network}-*.md      - Detailed report"
+    @echo "Individual Phase Commands (for manual workflows):"
+    @echo "  just e2e-deploy          - Deploy contracts using cast send"
+    @echo "  just e2e-setup           - Create campaign and allocations"
+    @echo "  just e2e-execute         - Execute test claims"
+    @echo "  just e2e-close           - Close campaign"
+    @echo "  just e2e-basic           - Run 4 basic phases with dummy addresses"
     @echo ""
-    @echo "For more details, see README-MULTINETWORK.md"
+    @echo "Quick Start:"
+    @echo "  1. Copy .env.example to .env and configure"
+    @echo "  2. Run: just e2e"
+    @echo "  3. Monitor: cat deployments.txt"
+    @echo ""
+    @echo "Architecture (Pure Foundry Toolchain):"
+    @echo "  - Phase 1: cast send --create (deploy contracts)"
+    @echo "  - Phase 2: cast send with complex ABI encoding (campaign + allocations)"
+    @echo "  - Phase 3: cast send (claim execution)"
+    @echo "  - Phase 4: cast send (campaign closure)"
+    @echo ""
+    @echo "Benefits:"
+    @echo "  ✓ Pure bash + cast tooling (no forge scripts in critical path)"
+    @echo "  ✓ Cosmos SDK EVM compatible (sequential transactions)"
+    @echo "  ✓ Easy to debug (transparent bash orchestration)"
+    @echo "  ✓ No temporary file pollution"
+    @echo ""
+    @echo "State Persistence:"
+    @echo "  - deployments.txt: Shared state across all phases"
+    @echo "  - Automatic timestamp recalculation for campaign start/end"
+    @echo ""

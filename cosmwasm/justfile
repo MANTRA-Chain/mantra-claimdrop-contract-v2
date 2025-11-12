@@ -147,15 +147,6 @@ deploy CHAIN='mantra-dukong-1' CODE_ID='':
         echo "Transaction failed. Check your wallet, chain connection, and gas settings."
         exit 1
     fi
-
-# Runs emergency script to close campaign (requires Node.js).
-emergency-close-campaign:
-    node scripts/emergency/close_campaign.js
-
-# Runs emergency script to retrieve unclaimed tokens (requires Node.js).
-emergency-retrieve-tokens:
-    node scripts/emergency/retrieve_tokens.js
-
 # Full CI pipeline: format check, lint strict, and test.
 ci:
     just format-check

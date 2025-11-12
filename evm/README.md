@@ -13,11 +13,12 @@ just deploy local          # Deploy to local Anvil
 just deploy dukong         # Deploy to DuKong testnet
 ```
 
-**📚 Full Documentation**: See [README-MULTINETWORK.md](./README-MULTINETWORK.md) for complete multi-network guide including:
-- Network configuration and timing profiles
-- Environment setup and .env examples
-- Troubleshooting common issues
-- Migration guide from old per-network commands
+**🚀 Hybrid Cast/Forge E2E Testing**: See the justfile recipes for hybrid E2E setup:
+- `just forge-e2e-deploy` - Deploy contracts using cast
+- `just forge-e2e-setup` - Create campaign and add allocations
+- `just forge-e2e-execute` - Execute test claims
+- `just forge-e2e-close` - Close campaign
+- `just forge-e2e-full` - Run all phases in sequence
 
 ## Features
 
@@ -84,7 +85,194 @@ just format           # Format Solidity files
 just format-check     # Check formatting (CI)
 just clean            # Clean build artifacts
 just ci               # Run CI pipeline (format-check + test-all)
+just e2e              # Run complete E2E test on testnet
+just e2e-report       # View E2E transaction report
 ```
+
+## Production-Grade Cast Scripts
+
+The EVM implementation includes **production-hardened cast-based deployment scripts** designed for reliability on Cosmos SDK EVM chains (MANTRA DuKong, mainnet). These scripts solve the nonce management issues that occur with `forge script` batch broadcasting on Cosmos SDK EVMs.
+
+### Key Features
+
+**🔒 Security Hardening**:
+- Private key format validation (prevents malformed keys)
+- `.env` file permission checks (warns if not 600/400)
+- `.gitignore` validation (prevents accidental key commits)
+- No private keys in logs or error messages
+
+**⚡ Robust Transaction Handling**:
+- Automatic transaction confirmation polling (no more blind `sleep` waits)
+- Exponential backoff (2s → 4s → 6s → 8s → 10s intervals)
+- Configurable timeout (default: 180 seconds)
+- Transaction status validation (detects failed transactions)
+- Revert reason extraction from failed transactions
+
+**💰 Dynamic Gas Pricing**:
+- Network gas price estimation via `cast gas-price`
+- Configurable min/max bounds (default: 10-200 gwei)
+- Manual override support via `GAS_PRICE` env var
+- Automatic fallback to safe default on estimation failure
+
+**⏱️ Deterministic Timing**:
+- Campaign start time calculated from actual block timestamp
+- Eliminates race conditions (no more 20-second buffer guessing)
+- Configurable safety buffer (default: 30 seconds)
+- Validation that start time is in the future
+
+**🔍 Comprehensive Validation**:
+- RPC connectivity checks before execution
+- Ethereum address format validation
+- Contract existence verification (prevents calls to non-existent contracts)
+- Required environment variable validation with clear error messages
+
+**📊 Enhanced Logging**:
+- Color-coded output (disabled in CI/non-TTY environments)
+- Severity levels: INFO, WARN, ERROR, DEBUG
+- Debug mode for verbose logging (`DEBUG=1`)
+- Transaction tracking with report generation
+
+### Configuration Options
+
+All scripts support the following environment variables:
+
+```bash
+# Required
+RPC_URL=<your_rpc_endpoint>
+PRIVATE_KEY=<64_hex_chars>
+
+# Gas Configuration (optional)
+GAS_PRICE=50000000000           # Manual override in wei (default: dynamic estimation)
+GAS_PRICE_MIN=10000000000       # Minimum gas price (default: 10 gwei)
+GAS_PRICE_MAX=200000000000      # Maximum gas price (default: 200 gwei)
+GAS_LIMIT=10000000              # Gas limit for transactions (default: 10000000)
+
+# Transaction Settings (optional)
+TX_CONFIRMATION_TIMEOUT=180     # Confirmation timeout in seconds (default: 180)
+
+# Campaign Timing (optional)
+CAMPAIGN_START_BUFFER=30        # Safety buffer after campaign creation (default: 30)
+
+# Debug Mode (optional)
+DEBUG=1                         # Enable verbose logging (default: 0)
+```
+
+### Available Scripts
+
+1. **`cast-deploy.sh`** - Deploy contracts (MockERC20 + Claimdrop)
+   - Validates environment and RPC connectivity
+   - Deploys contracts with confirmed transactions
+   - Verifies deployment on-chain
+   - Saves state to `deployments.txt`
+
+2. **`cast-setup.sh`** - Campaign setup
+   - Mints test tokens
+   - Approves token transfer
+   - Creates campaign with deterministic timing
+   - Transfers reward tokens
+   - Adds test allocations
+
+3. **`cast-execute-claims.sh`** - Execute test claims
+   - Waits for campaign start automatically
+   - Executes claims with confirmation
+   - Validates all transactions
+
+4. **`cast-close-campaign.sh`** - Close campaign
+   - Waits for campaign end automatically
+   - Closes campaign with confirmation
+   - Returns unclaimed tokens to owner
+
+5. **`cast-e2e-complete.sh`** - Full E2E orchestration
+   - Generates temporary test wallets
+   - Funds test addresses (2 OM each)
+   - Runs complete E2E flow with claim simulation
+   - Uses block timestamps for accurate campaign timing
+   - Sweeps funds back to deployer
+   - Generates transaction report with Mantrascan links
+
+### Usage Examples
+
+```bash
+# Full E2E test on DuKong testnet
+cd evm
+just e2e-deploy    # Deploy contracts
+just e2e-setup     # Setup campaign
+just e2e-execute   # Execute claims
+just e2e-close     # Close campaign
+
+# Or run everything at once
+just e2e           # Complete E2E flow
+just e2e-report    # View formatted transaction report with Mantrascan links
+
+# Run E2E and generate report
+just e2e && just e2e-report
+
+# With custom configuration
+GAS_PRICE_MAX=100000000000 DEBUG=1 just e2e-deploy
+GAS_LIMIT=15000000 just e2e  # Increase gas limit for complex operations
+
+# Manual script execution
+export RPC_URL="https://evm.dukong.mantrachain.io"
+export PRIVATE_KEY="your_key_here"
+./scripts/cast-deploy.sh
+```
+
+### Error Handling & Troubleshooting
+
+**Common Error Messages**:
+
+- `❌ Failed to connect to RPC endpoint` - Check RPC_URL is correct and accessible
+- `❌ Invalid private key format` - Private key must be 64 hex characters
+- `❌ Invalid Ethereum address format` - Address must be 0x + 40 hex characters
+- `❌ Contract has no code deployed` - Address is not a contract or deployment failed
+- `❌ Transaction confirmation timeout` - Network congestion or RPC issues
+- `⚠️ .env file has insecure permissions` - Run `chmod 600 .env`
+
+**Debug Mode**:
+
+Enable verbose logging to troubleshoot issues:
+
+```bash
+DEBUG=1 ./scripts/cast-deploy.sh
+```
+
+This shows:
+- All function calls and parameters
+- Transaction polling progress
+- Gas price calculation details
+- Address validation steps
+- RPC connectivity checks
+
+**Network Issues**:
+
+If transactions time out:
+1. Check RPC endpoint is responsive: `cast block latest --rpc-url $RPC_URL`
+2. Increase timeout: `TX_CONFIRMATION_TIMEOUT=300 ./scripts/cast-deploy.sh`
+3. Try different RPC endpoint if available
+
+**Gas Price Issues**:
+
+If transactions fail due to gas:
+1. Check current network gas price: `cast gas-price --rpc-url $RPC_URL`
+2. Set manual gas price: `GAS_PRICE=100000000000 ./scripts/cast-deploy.sh`
+3. Adjust bounds: `GAS_PRICE_MAX=500000000000 ./scripts/cast-deploy.sh`
+
+### Security Best Practices
+
+**Private Key Management**:
+1. Store keys in `.env` file, never in code
+2. Set restrictive permissions: `chmod 600 .env`
+3. Verify `.env` is in `.gitignore`
+4. Never commit or share private keys
+5. Use hardware wallets (Ledger) for production
+
+**Pre-Deployment Checklist**:
+- [ ] `.env` has 600 permissions
+- [ ] `.env` is in `.gitignore`
+- [ ] RPC URL is correct for target network
+- [ ] Test deployment on testnet first
+- [ ] Verify contract addresses after deployment
+- [ ] Keep transaction hashes for verification
 
 ## Deployment
 
@@ -224,16 +412,6 @@ OWNER_ADDRESS=<optional_owner_address>
 - [Forge Reference](https://book.getfoundry.sh/reference/forge/)
 - [Cast Reference](https://book.getfoundry.sh/reference/cast/)
 
-## Migration from Hardhat
-
-This project was migrated from Hardhat to Foundry for:
-
-- **Native language testing**: Solidity tests for Solidity contracts
-- **Performance**: 30-50% faster compilation and testing
-- **Unified toolchain**: Rust-based tooling across the project
-- **Modern best practices**: Industry-leading framework for 2025
-
-All 41 tests were successfully ported from JavaScript to Solidity.
 
 ## License
 
