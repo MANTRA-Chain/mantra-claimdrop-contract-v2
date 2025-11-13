@@ -13,27 +13,18 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
  */
 contract DeployFactory is Script {
     function run() external {
-        bool useLedger = vm.envExists("USE_LEDGER") && vm.envBool("USE_LEDGER");
-        address deployer;
+        // Load admin private keys from env
+        uint256 factoryAdminPrivateKey = vm.envUint("FACTORY_ADMIN_PRIVATE_KEY");
+        uint256 proxyAdminPrivateKey = vm.envUint("PROXY_ADMIN_PRIVATE_KEY");
+        address factoryAdmin = vm.addr(factoryAdminPrivateKey);
+        address proxyAdmin = vm.addr(proxyAdminPrivateKey);
 
         console.log("Deploying upgradeable PrimarySaleClaimdropFactory contract...");
-        if (useLedger) {
-            deployer = vm.envAddress("LEDGER_ADDRESS");
-            console.log("Using Ledger as deployer, address is ", deployer);
-            vm.startBroadcast(deployer);
-        } else {
-            uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-            deployer = vm.addr(deployerPrivateKey);
-            console.log("Using private key as deployer, address is ", deployer);
-            vm.startBroadcast(deployerPrivateKey);
-        }
+        console.log("Factory Admin address: ", factoryAdmin);
+        console.log("Proxy Admin address: ", proxyAdmin);
 
-        // Check deployer balance
-        uint256 balance = deployer.balance;
-        console.log("Deployer balance:", (balance / 1e18), ".", (balance % 1e18));
-
-        uint256 nonce = vm.getNonce(deployer);
-        console.log("Deployer nonce:", nonce);
+        // Use factory admin for broadcasting deployment
+        vm.startBroadcast(factoryAdminPrivateKey);
 
         // 1. Deploy the implementation contract
         console.log("\n1. Deploying PrimarySaleClaimdropFactory implementation...");
@@ -47,31 +38,31 @@ contract DeployFactory is Script {
         
         bytes memory initData = abi.encodeCall(
             PrimarySaleClaimdropFactory.initialize,
-            (deployer, factoryName, factorySlug, factoryDescription)
+            (factoryAdmin, factoryName, factorySlug, factoryDescription)
         );
 
-        // 3. Deploy the TransparentUpgradeableProxy
+        // 3. Deploy the TransparentUpgradeableProxy with proxyAdmin as admin
         console.log("\n3. Deploying TransparentUpgradeableProxy...");
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),
-            deployer,
+            proxyAdmin,
             initData
         );
         console.log("Proxy deployed to:", address(proxy));
 
         vm.stopBroadcast();
 
-        // Get the ProxyAdmin address that was created by the proxy
+        // Get the ProxyAdmin address that was set
         bytes32 adminSlot = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
-        address proxyAdmin = address(uint160(uint256(vm.load(address(proxy), adminSlot))));
+        address actualProxyAdmin = address(uint160(uint256(vm.load(address(proxy), adminSlot))));
 
         console.log("\n========================================");
         console.log("Deployment Summary:");
         console.log("========================================");
         console.log("Implementation:", address(implementation));
-        console.log("ProxyAdmin:", address(proxyAdmin));
+        console.log("ProxyAdmin:", address(actualProxyAdmin));
         console.log("Proxy (PrimarySaleClaimdropFactory):", address(proxy));
-        console.log("Factory Owner:", deployer);
+        console.log("Factory Owner:", factoryAdmin);
         console.log("Factory Name:", factoryName);
         console.log("Factory Slug:", factorySlug);
         console.log("========================================");
