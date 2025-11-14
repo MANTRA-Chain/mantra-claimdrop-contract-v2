@@ -14,7 +14,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 contract DeployFactory is Script {
     function run() external {
         // Load admin private key from env
-        uint256 factoryAdminPrivateKey = vm.envUint("FACTORY_ADMIN_PRIVATE_KEY");
+        uint256 factoryAdminPrivateKey = vm.envUint("PRIVATE_KEY");
         address factoryAdmin = vm.addr(factoryAdminPrivateKey);
 
         console.log("Deploying upgradeable PrimarySaleClaimdropFactory contract...");
@@ -25,7 +25,7 @@ contract DeployFactory is Script {
 
         // 1. Deploy the ProxyAdmin contract
         console.log("\n1. Deploying ProxyAdmin contract...");
-        ProxyAdmin proxyAdmin = new ProxyAdmin(factoryAdmin);
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
         console.log("ProxyAdmin deployed to:", address(proxyAdmin));
 
         // 2. Deploy the implementation contract
