@@ -13,54 +13,53 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
  */
 contract DeployFactory is Script {
     function run() external {
-        // Load admin private keys from env
+        // Load admin private key from env
         uint256 factoryAdminPrivateKey = vm.envUint("FACTORY_ADMIN_PRIVATE_KEY");
-        uint256 proxyAdminPrivateKey = vm.envUint("PROXY_ADMIN_PRIVATE_KEY");
         address factoryAdmin = vm.addr(factoryAdminPrivateKey);
-        address proxyAdmin = vm.addr(proxyAdminPrivateKey);
 
         console.log("Deploying upgradeable PrimarySaleClaimdropFactory contract...");
         console.log("Factory Admin address: ", factoryAdmin);
-        console.log("Proxy Admin address: ", proxyAdmin);
 
         // Use factory admin for broadcasting deployment
         vm.startBroadcast(factoryAdminPrivateKey);
 
-        // 1. Deploy the implementation contract
-        console.log("\n1. Deploying PrimarySaleClaimdropFactory implementation...");
+        // 1. Deploy the ProxyAdmin contract
+        console.log("\n1. Deploying ProxyAdmin contract...");
+        ProxyAdmin proxyAdmin = new ProxyAdmin(factoryAdmin);
+        console.log("ProxyAdmin deployed to:", address(proxyAdmin));
+
+        // 2. Deploy the implementation contract
+        console.log("\n2. Deploying PrimarySaleClaimdropFactory implementation...");
         PrimarySaleClaimdropFactory implementation = new PrimarySaleClaimdropFactory();
         console.log("Implementation deployed to:", address(implementation));
 
-        // 2. Prepare initialization data with metadata
+        // 3. Prepare initialization data with metadata
         string memory factoryName = "MANTRA Primary Sale & Claimdrop Factory";
         string memory factorySlug = "mantra-factory";
         string memory factoryDescription = "Factory for deploying and managing Claimdrop and PrimarySale contracts";
-        
+
         bytes memory initData = abi.encodeCall(
             PrimarySaleClaimdropFactory.initialize,
             (factoryAdmin, factoryName, factorySlug, factoryDescription)
         );
 
-        // 3. Deploy the TransparentUpgradeableProxy with proxyAdmin as admin
-        console.log("\n3. Deploying TransparentUpgradeableProxy...");
+        // 4. Deploy the TransparentUpgradeableProxy with ProxyAdmin contract as admin
+        console.log("\n4. Deploying TransparentUpgradeableProxy...");
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),
-            proxyAdmin,
+            address(proxyAdmin),
             initData
         );
         console.log("Proxy deployed to:", address(proxy));
 
         vm.stopBroadcast();
 
-        // Get the ProxyAdmin address that was set
-        bytes32 adminSlot = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
-        address actualProxyAdmin = address(uint160(uint256(vm.load(address(proxy), adminSlot))));
-
         console.log("\n========================================");
         console.log("Deployment Summary:");
         console.log("========================================");
+        console.log("ProxyAdmin Contract:", address(proxyAdmin));
+        console.log("ProxyAdmin Owner:", factoryAdmin);
         console.log("Implementation:", address(implementation));
-        console.log("ProxyAdmin:", address(actualProxyAdmin));
         console.log("Proxy (PrimarySaleClaimdropFactory):", address(proxy));
         console.log("Factory Owner:", factoryAdmin);
         console.log("Factory Name:", factoryName);
