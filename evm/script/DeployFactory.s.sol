@@ -2,72 +2,68 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ClaimdropFactory} from "../contracts/ClaimdropFactory.sol";
+import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 /**
  * @title DeployFactory
- * @notice Deployment script for upgradeable ClaimdropFactory contract
+ * @notice Deployment script for upgradeable PrimarySaleClaimdropFactory contract
  * @dev Run with: forge script script/DeployFactory.s.sol:DeployFactory --rpc-url $RPC_URL --broadcast
  */
 contract DeployFactory is Script {
     function run() external {
-        bool useLedger = vm.envExists("USE_LEDGER") && vm.envBool("USE_LEDGER");
-        address deployer;
+        // Load admin private key from env
+        uint256 factoryAdminPrivateKey = vm.envUint("PRIVATE_KEY");
+        address factoryAdmin = vm.addr(factoryAdminPrivateKey);
 
-        console.log("Deploying upgradeable ClaimdropFactory contract...");
-        if (useLedger) {
-            deployer = vm.envAddress("LEDGER_ADDRESS");
-            console.log("Using Ledger as deployer, address is ", deployer);
-            vm.startBroadcast(deployer);
-        } else {
-            uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-            deployer = vm.addr(deployerPrivateKey);
-            console.log("Using private key as deployer, address is ", deployer);
-            vm.startBroadcast(deployerPrivateKey);
-        }
+        console.log("Deploying upgradeable PrimarySaleClaimdropFactory contract...");
+        console.log("Factory Admin address: ", factoryAdmin);
 
-        // Check deployer balance
-        uint256 balance = deployer.balance;
-        console.log("Deployer balance:", (balance / 1e18), ".", (balance % 1e18));
+        // Use factory admin for broadcasting deployment
+        vm.startBroadcast(factoryAdminPrivateKey);
 
-        uint256 nonce = vm.getNonce(deployer);
-        console.log("Deployer nonce:", nonce);
+        // 1. Deploy the ProxyAdmin contract
+        console.log("\n1. Deploying ProxyAdmin contract...");
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        console.log("ProxyAdmin deployed to:", address(proxyAdmin));
 
-        // 1. Deploy the implementation contract
-        console.log("\n1. Deploying ClaimdropFactory implementation...");
-        ClaimdropFactory implementation = new ClaimdropFactory();
+        // 2. Deploy the implementation contract
+        console.log("\n2. Deploying PrimarySaleClaimdropFactory implementation...");
+        PrimarySaleClaimdropFactory implementation = new PrimarySaleClaimdropFactory();
         console.log("Implementation deployed to:", address(implementation));
 
-        // 2. Prepare initialization data
+        // 3. Prepare initialization data with metadata
+        string memory factoryName = "MANTRA Primary Sale & Claimdrop Factory";
+        string memory factorySlug = "mantra-factory";
+        string memory factoryDescription = "Factory for deploying and managing Claimdrop and PrimarySale contracts";
+
         bytes memory initData = abi.encodeCall(
-            ClaimdropFactory.initialize,
-            (deployer)
+            PrimarySaleClaimdropFactory.initialize,
+            (factoryAdmin, factoryName, factorySlug, factoryDescription)
         );
 
-        // 3. Deploy the TransparentUpgradeableProxy
-        console.log("\n3. Deploying TransparentUpgradeableProxy...");
+        // 4. Deploy the TransparentUpgradeableProxy with ProxyAdmin contract as admin
+        console.log("\n4. Deploying TransparentUpgradeableProxy...");
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),
-            deployer,
+            address(proxyAdmin),
             initData
         );
         console.log("Proxy deployed to:", address(proxy));
 
         vm.stopBroadcast();
 
-        // Get the ProxyAdmin address that was created by the proxy
-        bytes32 adminSlot = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
-        address proxyAdmin = address(uint160(uint256(vm.load(address(proxy), adminSlot))));
-
         console.log("\n========================================");
         console.log("Deployment Summary:");
         console.log("========================================");
+        console.log("ProxyAdmin Contract:", address(proxyAdmin));
+        console.log("ProxyAdmin Owner:", factoryAdmin);
         console.log("Implementation:", address(implementation));
-        console.log("ProxyAdmin:", address(proxyAdmin));
-        console.log("Proxy (ClaimdropFactory):", address(proxy));
-        console.log("Factory Owner:", deployer);
+        console.log("Proxy (PrimarySaleClaimdropFactory):", address(proxy));
+        console.log("Factory Owner:", factoryAdmin);
+        console.log("Factory Name:", factoryName);
+        console.log("Factory Slug:", factorySlug);
         console.log("========================================");
         console.log("Deployment complete!");
     }
