@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Claimdrop} from "./Claimdrop.sol";
 
 /**
@@ -36,6 +37,18 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @notice Address of the receipt token
     address public receiptToken;
 
+    /// @notice Address of the receipt token owner
+    address public receiptTokenOwner;
+
+    /// @notice Interest rate in basis points
+    uint256 public rateInBps;
+
+    /// @notice Interest-only period duration
+    uint256 public interestOnlyPeriod;
+
+    /// @notice Repayment period duration
+    uint256 public repaymentPeriod;
+
     // ============ Events ============
 
     /// @notice Emitted when a new Claimdrop is deployed
@@ -50,11 +63,33 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         uint256 index
     );
 
-    /// @notice Emitted when PrimarySale is deployed
+    /// @notice Emitted when PrimarySale is set with metadata
     /// @param primarySaleAddress Address of the newly deployed PrimarySale
     /// @param admin Admin of the PrimarySale
+    /// @param rateInBps Interest rate in basis points
+    /// @param interestOnlyPeriod Interest-only period duration
+    /// @param repaymentPeriod Repayment period duration
     event PrimarySaleSet(
         address indexed primarySaleAddress,
+        address indexed admin,
+        uint256 rateInBps,
+        uint256 interestOnlyPeriod,
+        uint256 repaymentPeriod
+    );
+
+    /// @notice Emitted when receipt token is updated
+    /// @param receiptTokenAddress Address of the receipt token
+    /// @param admin Admin who set the receipt token
+    event ReceiptTokenSet(
+        address indexed receiptTokenAddress,
+        address indexed admin
+    );
+
+    /// @notice Emitted when receipt token owner is updated
+    /// @param receiptTokenOwnerAddress Address of the receipt token owner
+    /// @param admin Admin who set the receipt token owner
+    event ReceiptTokenOwnerSet(
+        address indexed receiptTokenOwnerAddress,
         address indexed admin
     );
 
@@ -71,6 +106,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     error StringTooLong();
     error InvalidSlugFormat();
     error IndexOutOfBounds();
+    error NotERC20Token();
 
     // ============ Constructor ============
 
@@ -120,16 +156,52 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         emit ClaimdropDeployed(primarySale, claimdropAddress, owner(), deployedClaimdrops.length - 1);
     }
 
-    /// @notice Set the PrimarySale contract address (only one allowed)
+    /// @notice Set the PrimarySale contract address with metadata
     /// @dev PrimarySale must be deployed externally to avoid contract size limits
+    /// @dev This is the only way to set primarySale, rateInBps, interestOnlyPeriod, and repaymentPeriod
     /// @param primarySale_ Address of the deployed PrimarySale contract
-    function setPrimarySale(address primarySale_) external onlyOwner whenNotPaused {
+    /// @param rateInBps_ Interest rate in basis points
+    /// @param interestOnlyPeriod_ Interest-only period duration
+    /// @param repaymentPeriod_ Repayment period duration
+    function setPrimarySaleWithMetadata(
+        address primarySale_,
+        uint256 rateInBps_,
+        uint256 interestOnlyPeriod_,
+        uint256 repaymentPeriod_
+    ) external onlyOwner whenNotPaused {
         if (primarySale != address(0)) revert PrimarySaleAlreadyDeployed();
         if (primarySale_ == address(0)) revert InvalidAddress();
 
         primarySale = primarySale_;
+        rateInBps = rateInBps_;
+        interestOnlyPeriod = interestOnlyPeriod_;
+        repaymentPeriod = repaymentPeriod_;
 
-        emit PrimarySaleSet(primarySale_, owner());
+        emit PrimarySaleSet(primarySale_, owner(), rateInBps_, interestOnlyPeriod_, repaymentPeriod_);
+    }
+
+    /// @notice Set the receipt token address
+    /// @param receiptToken_ Address of the receipt token contract
+    function setReceiptToken(address receiptToken_) external onlyOwner {
+        if (receiptToken_ == address(0)) revert InvalidAddress();
+        
+        // Validate it's an ERC-20 token by checking if it implements totalSupply()
+        try IERC20(receiptToken_).totalSupply() returns (uint256) {
+            // Successfully called totalSupply, it's likely an ERC-20
+            receiptToken = receiptToken_;
+            emit ReceiptTokenSet(receiptToken_, owner());
+        } catch {
+            revert NotERC20Token();
+        }
+    }
+
+    /// @notice Set the receipt token owner address
+    /// @param receiptTokenOwner_ Address of the receipt token owner
+    function setReceiptTokenOwner(address receiptTokenOwner_) external onlyOwner {
+        if (receiptTokenOwner_ == address(0)) revert InvalidAddress();
+        
+        receiptTokenOwner = receiptTokenOwner_;
+        emit ReceiptTokenOwnerSet(receiptTokenOwner_, owner());
     }
 
     /// @notice Get the total number of deployed Claimdrops
@@ -202,6 +274,14 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
 
         // Reset receipt token
         receiptToken = address(0);
+
+        // Reset receipt token owner
+        receiptTokenOwner = address(0);
+
+        // Reset rate and periods
+        rateInBps = 0;
+        interestOnlyPeriod = 0;
+        repaymentPeriod = 0;
 
         emit FactoryReset();
     }
