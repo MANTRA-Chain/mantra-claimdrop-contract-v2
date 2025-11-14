@@ -67,6 +67,9 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     error InvalidAddress();
     error PrimarySaleNotSet();
     error ResetNotAllowedOnMainnet();
+    error EmptyString();
+    error StringTooLong();
+    error InvalidSlugFormat();
 
     // ============ Constructor ============
 
@@ -88,6 +91,9 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     ) public initializer {
         __Ownable_init(initialOwner);
         __Pausable_init();
+        _validateString(name_, 100);
+        _validateSlug(slug_, 50);
+        _validateString(description_, 500);
         name = name_;
         slug = slug_;
         description = description_;
@@ -166,6 +172,9 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         string memory slug_,
         string memory description_
     ) external onlyOwner {
+        _validateString(name_, 100);
+        _validateSlug(slug_, 50);
+        _validateString(description_, 500);
         name = name_;
         slug = slug_;
         description = description_;
@@ -208,5 +217,37 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @dev Only owner can unpause
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    // ============ Internal Functions ============
+
+    /// @notice Validate string length
+    /// @param str String to validate
+    /// @param maxLength Maximum allowed length
+    function _validateString(string memory str, uint256 maxLength) internal pure {
+        bytes memory strBytes = bytes(str);
+        if (strBytes.length == 0) revert EmptyString();
+        if (strBytes.length > maxLength) revert StringTooLong();
+    }
+
+    /// @notice Validate slug is URL-friendly (lowercase letters, numbers, hyphens only)
+    /// @param slug_ Slug to validate
+    /// @param maxLength Maximum allowed length
+    function _validateSlug(string memory slug_, uint256 maxLength) internal pure {
+        bytes memory slugBytes = bytes(slug_);
+        if (slugBytes.length == 0) revert EmptyString();
+        if (slugBytes.length > maxLength) revert StringTooLong();
+        
+        // Check each character is lowercase letter (a-z), number (0-9), or hyphen (-)
+        for (uint256 i = 0; i < slugBytes.length; i++) {
+            bytes1 char = slugBytes[i];
+            bool isLowercase = char >= 0x61 && char <= 0x7A; // a-z
+            bool isNumber = char >= 0x30 && char <= 0x39; // 0-9
+            bool isHyphen = char == 0x2D; // -
+            
+            if (!isLowercase && !isNumber && !isHyphen) {
+                revert InvalidSlugFormat();
+            }
+        }
     }
 }
