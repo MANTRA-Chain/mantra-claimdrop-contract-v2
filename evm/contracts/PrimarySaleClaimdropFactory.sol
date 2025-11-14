@@ -33,6 +33,9 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @notice Address of the deployed PrimarySale contract (only one allowed)
     address public primarySale;
 
+    /// @notice Address of the receipt token
+    address public receiptToken;
+
     // ============ Events ============
 
     /// @notice Emitted when a new Claimdrop is deployed
@@ -85,7 +88,6 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     ) public initializer {
         __Ownable_init(initialOwner);
         __Pausable_init();
-        
         name = name_;
         slug = slug_;
         description = description_;
@@ -187,6 +189,9 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
 
         // Reset primary sale
         primarySale = address(0);
+
+        // Reset receipt token
+        receiptToken = address(0);
 
         emit FactoryReset();
     }
