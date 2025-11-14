@@ -70,6 +70,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     error EmptyString();
     error StringTooLong();
     error InvalidSlugFormat();
+    error IndexOutOfBounds();
 
     // ============ Constructor ============
 
@@ -147,7 +148,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @param index Index in the deployedClaimdrops array
     /// @return claimdropAddress Address of the Claimdrop at the given index
     function getClaimdropAtIndex(uint256 index) external view returns (address claimdropAddress) {
-        require(index < deployedClaimdrops.length, "Index out of bounds");
+        if (index >= deployedClaimdrops.length) revert IndexOutOfBounds();
         return deployedClaimdrops[index];
     }
 
