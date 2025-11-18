@@ -28,6 +28,7 @@ jobs:
           args: --no-fail-fast --locked
         env:
           RUST_BACKTRACE: 1
+        working-directory: cosmwasm
 
   lints:
     name: Lints
@@ -49,19 +50,22 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+        working-directory: cosmwasm
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: -- -D warnings
+        working-directory: cosmwasm
 
       - name: Generate Schema
         uses: actions-rs/cargo@v1
         with:
           command: schema
           args: --locked
+        working-directory: cosmwasm
 
       - name: Schema Changes
         # fails if any changes not committed
-        run: git diff --exit-code schema
+        run: git diff --exit-code cosmwasm/schema
