@@ -1,0 +1,345 @@
+# EVM Claimdrop Contract - Build and Deployment Commands
+# Uses Foundry (forge) for all operations
+
+# Default recipe - show available commands
+default:
+    @just --list
+
+# Build contracts
+build:
+    @echo "🔨 Building contracts..."
+    @forge build
+
+# Run tests
+test:
+    @echo "🧪 Running tests..."
+    @forge test
+
+# Run tests without fail-fast (continue on failures)
+test-all:
+    @echo "🧪 Running all tests..."
+    @forge test
+
+# Run tests with gas reporting
+test-gas:
+    @echo "📊 Running tests with gas reporting..."
+    @REPORT_GAS=true forge test --gas-report
+
+# Generate coverage report
+coverage:
+    @echo "📈 Generating coverage report..."
+    @forge coverage
+
+# Format Solidity files
+format:
+    @echo "✨ Formatting Solidity files..."
+    @forge fmt
+
+# Check formatting (CI mode)
+format-check:
+    @echo "✅ Checking Solidity formatting..."
+    @forge fmt --check
+
+# Lint contracts with solhint (requires solhint installed globally)
+lint:
+    @echo "🔍 Linting contracts..."
+    @solhint 'contracts/**/*.sol' || echo "⚠️  Install solhint globally: npm install -g solhint"
+
+# Clean build artifacts
+clean:
+    @echo "🧹 Cleaning build artifacts..."
+    @forge clean
+
+# Deploy to local Anvil node
+deploy-local:
+    @echo "🚀 Deploying to local Anvil..."
+    @forge script script/Deploy.s.sol:Deploy --rpc-url http://localhost:8545 --broadcast
+
+# Deploy to MANTRA Dukong testnet
+deploy-testnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "🚀 Deploying to MANTRA Dukong testnet..."
+    forge script script/Deploy.s.sol:Deploy \
+        --rpc-url $MANTRA_DUKONG_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Deployment complete!"
+
+# Deploy to MANTRA mainnet
+deploy-mainnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "⚠️  Deploying to MAINNET - please confirm"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Deployment cancelled"
+        exit 1
+    fi
+    echo "🚀 Deploying to MANTRA mainnet..."
+    forge script script/Deploy.s.sol:Deploy \
+        --rpc-url $MANTRA_MAINNET_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Deployment complete!"
+
+# Deploy upgradeable ClaimdropFactory to local Anvil node
+deploy-factory-local:
+    @echo "🏭 Deploying ClaimdropFactory (upgradeable) to local Anvil..."
+    @forge script script/DeployFactory.s.sol:DeployFactory --rpc-url http://localhost:8545 --broadcast
+
+# Deploy upgradeable ClaimdropFactory to MANTRA Dukong testnet
+deploy-factory-testnet:
+    #!/usr/bin/env bash
+    source .env
+    set -euo pipefail
+    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "🏭 Deploying ClaimdropFactory (upgradeable) to MANTRA Dukong testnet..."
+    forge script script/DeployFactory.s.sol:DeployFactory \
+        --rpc-url $MANTRA_DUKONG_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Factory deployment complete!"
+    echo "📝 Save the ProxyAdmin and Proxy addresses for future upgrades!"
+
+# Deploy upgradeable ClaimdropFactory to MANTRA mainnet
+deploy-factory-mainnet:
+    #!/usr/bin/env bash
+    source .env
+    set -euo pipefail
+    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "⚠️  Deploying ClaimdropFactory to MAINNET - please confirm"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Deployment cancelled"
+        exit 1
+    fi
+    echo "🏭 Deploying ClaimdropFactory (upgradeable) to MANTRA mainnet..."
+    forge script script/DeployFactory.s.sol:DeployFactory \
+        --rpc-url $MANTRA_MAINNET_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Factory deployment complete!"
+    echo "📝 Save the ProxyAdmin and Proxy addresses for future upgrades!"
+
+# Upgrade ClaimdropFactory on MANTRA Dukong testnet
+upgrade-factory-testnet:
+    #!/usr/bin/env bash
+    source .env
+    set -euo pipefail
+    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    if [ -z "${PROXY_ADDRESS:-}" ]; then
+        echo "❌ Error: PROXY_ADDRESS not set"
+        exit 1
+    fi
+    if [ -z "${PROXY_ADMIN_ADDRESS:-}" ]; then
+        echo "❌ Error: PROXY_ADMIN_ADDRESS not set"
+        exit 1
+    fi
+    echo "🔄 Upgrading ClaimdropFactory on MANTRA Dukong testnet..."
+    echo "   Proxy: $PROXY_ADDRESS"
+    echo "   ProxyAdmin: $PROXY_ADMIN_ADDRESS"
+    forge script script/UpgradeFactory.s.sol:UpgradeFactory \
+        --rpc-url $MANTRA_DUKONG_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Factory upgrade complete!"
+
+# Upgrade ClaimdropFactory on MANTRA mainnet
+upgrade-factory-mainnet:
+    #!/usr/bin/env bash
+    source .env
+    set -euo pipefail
+    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    if [ -z "${PROXY_ADDRESS:-}" ]; then
+        echo "❌ Error: PROXY_ADDRESS not set"
+        exit 1
+    fi
+    if [ -z "${PROXY_ADMIN_ADDRESS:-}" ]; then
+        echo "❌ Error: PROXY_ADMIN_ADDRESS not set"
+        exit 1
+    fi
+    echo "⚠️  Upgrading ClaimdropFactory on MAINNET - please confirm"
+    echo "   Proxy: $PROXY_ADDRESS"
+    echo "   ProxyAdmin: $PROXY_ADMIN_ADDRESS"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Upgrade cancelled"
+        exit 1
+    fi
+    echo "🔄 Upgrading ClaimdropFactory on MANTRA mainnet..."
+    forge script script/UpgradeFactory.s.sol:UpgradeFactory \
+        --rpc-url $MANTRA_MAINNET_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Factory upgrade complete!"
+
+# Verify contract on block explorer
+verify CONTRACT_ADDRESS CHAIN="mantradukong":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "{{CHAIN}}" = "mantradukong" ]; then
+        VERIFIER_URL="https://evm.dukong.mantrachain.io/api"
+    else
+        VERIFIER_URL="https://evm.mantrachain.io/api"
+    fi
+    echo "🔍 Verifying contract on {{CHAIN}}..."
+    forge verify-contract {{CONTRACT_ADDRESS}} \
+        contracts/Claimdrop.sol:Claimdrop \
+        --verifier-url $VERIFIER_URL \
+        --watch
+    echo "✅ Verification complete!"
+
+# Create campaign on local Anvil (requires .env with campaign parameters)
+create-campaign-local:
+    @echo "📋 Creating campaign on local Anvil..."
+    @forge script script/CreateCampaign.s.sol:CreateCampaign --rpc-url http://localhost:8545 --broadcast
+
+# Create campaign on testnet (requires .env with campaign parameters)
+create-campaign-testnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "📋 Creating campaign on MANTRA Dukong testnet..."
+    forge script script/CreateCampaign.s.sol:CreateCampaign \
+        --rpc-url $MANTRA_DUKONG_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Campaign created!"
+
+# Create campaign on mainnet (requires .env with campaign parameters)
+create-campaign-mainnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "⚠️  Creating campaign on MAINNET - please confirm"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Campaign creation cancelled"
+        exit 1
+    fi
+    echo "📋 Creating campaign on MANTRA mainnet..."
+    forge script script/CreateCampaign.s.sol:CreateCampaign \
+        --rpc-url $MANTRA_MAINNET_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Campaign created!"
+
+# Upload allocations to local Anvil (requires .env with CLAIMDROP_ADDRESS and ALLOCATIONS_FILE)
+upload-allocations-local:
+    @echo "📤 Uploading allocations to local Anvil..."
+    @forge script script/UploadAllocations.s.sol:UploadAllocations --rpc-url http://localhost:8545 --broadcast
+
+# Upload allocations to testnet (requires .env with CLAIMDROP_ADDRESS and ALLOCATIONS_FILE)
+upload-allocations-testnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "📤 Uploading allocations to MANTRA Dukong testnet..."
+    forge script script/UploadAllocations.s.sol:UploadAllocations \
+        --rpc-url $MANTRA_DUKONG_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Allocations uploaded!"
+
+# Upload allocations to mainnet (requires .env with CLAIMDROP_ADDRESS and ALLOCATIONS_FILE)
+upload-allocations-mainnet:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
+        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
+        exit 1
+    fi
+    if [ -z "${PRIVATE_KEY:-}" ]; then
+        echo "❌ Error: PRIVATE_KEY not set"
+        exit 1
+    fi
+    echo "⚠️  Uploading allocations to MAINNET - please confirm"
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Allocation upload cancelled"
+        exit 1
+    fi
+    echo "📤 Uploading allocations to MANTRA mainnet..."
+    forge script script/UploadAllocations.s.sol:UploadAllocations \
+        --rpc-url $MANTRA_MAINNET_RPC_URL \
+        --private-key $PRIVATE_KEY \
+        --broadcast
+    echo "✅ Allocations uploaded!"
+
+# Run CI pipeline (format-check + lint + test-all)
+ci:
+    @echo "🚀 Running CI pipeline..."
+    @just format-check
+    @just test-all
+    @echo "✅ CI pipeline complete!"

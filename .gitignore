@@ -20,3 +20,4 @@ cosmwasm/scripts/package-lock.json
 .cursor
 .claude
 CLAUDE.md
+PRPs/*

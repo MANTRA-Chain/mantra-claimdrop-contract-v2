@@ -1,0 +1,29 @@
+node_modules
+.env
+.env.test
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Hardhat files (legacy)
+artifacts
+
+# Foundry files
+cache/
+out/
+broadcast/
+foundry.lock
+
+# Test files
+test-allocations.json
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
