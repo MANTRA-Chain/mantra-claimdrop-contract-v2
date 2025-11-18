@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
-import {Claimdrop} from "../contracts/Claimdrop.sol";
-import {MockERC20} from "../contracts/mocks/MockERC20.sol";
+import { Test, console } from "forge-std/Test.sol";
+import { Claimdrop } from "../contracts/Claimdrop.sol";
+import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
 
 /**
  * @title ClaimdropTest
@@ -50,6 +50,10 @@ contract ClaimdropTest is Test {
     bytes4 constant CAMPAIGN_CLOSED_SELECTOR = bytes4(keccak256("CampaignAlreadyClosed()"));
     bytes4 constant NOTHING_TO_CLAIM_SELECTOR = bytes4(keccak256("NothingToClaim()"));
     bytes4 constant ZERO_AMOUNT_SELECTOR = bytes4(keccak256("ZeroAmount()"));
+
+    /// @notice Event declarations for expectEmit
+    event Claimed(address indexed user, uint256 indexed amount, address indexed sender);
+    event BatchClaimed(uint256 count, string memo, address indexed sender);
 
     function setUp() public {
         // Create test accounts
@@ -184,15 +188,20 @@ contract ClaimdropTest is Test {
      * @param elapsed Time elapsed since vesting started
      * @param duration Total vesting duration
      */
-    function calculateVestedAmount(uint256 totalAmount, uint256 vestingBps, uint256 elapsed, uint256 duration)
+    function calculateVestedAmount(
+        uint256 totalAmount,
+        uint256 vestingBps,
+        uint256 elapsed,
+        uint256 duration
+    )
         internal
         pure
         returns (uint256)
     {
         if (elapsed >= duration) {
-            return (totalAmount * vestingBps) / 10000;
+            return (totalAmount * vestingBps) / 10_000;
         }
-        return (totalAmount * vestingBps * elapsed) / (duration * 10000);
+        return (totalAmount * vestingBps * elapsed) / (duration * 10_000);
     }
 
     // ============ Tests Begin Here ============
@@ -245,7 +254,7 @@ contract ClaimdropTest is Test {
             })
         );
 
-        vm.expectRevert(abi.encodeWithSelector(INVALID_PERCENTAGE_SUM_SELECTOR, 5000, 10000));
+        vm.expectRevert(abi.encodeWithSelector(INVALID_PERCENTAGE_SUM_SELECTOR, 5000, 10_000));
         claimdrop.createCampaign(
             "Test", "Test", "airdrop", address(token), 1000 ether, distributions, uint64(startTime), uint64(endTime)
         );
@@ -354,7 +363,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -395,7 +404,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -430,7 +439,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -464,7 +473,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -500,7 +509,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -536,7 +545,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -571,7 +580,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -612,7 +621,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -644,7 +653,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -681,7 +690,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -718,7 +727,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -762,7 +771,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -799,7 +808,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -839,7 +848,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LinearVesting,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: uint64(endTime),
                 cliffDuration: 0
@@ -891,7 +900,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LinearVesting,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: uint64(endTime),
                 cliffDuration: 0
@@ -934,7 +943,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LinearVesting,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: uint64(endTime),
                 cliffDuration: uint64(cliffDuration)
@@ -973,7 +982,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LinearVesting,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: uint64(endTime),
                 cliffDuration: uint64(cliffDuration)
@@ -1132,6 +1141,354 @@ contract ClaimdropTest is Test {
     }
 
     // ============================================
+    // Batch Claim Tests (8 tests)
+    // ============================================
+
+    function test_ShouldAllowBatchClaimOnBehalfOfUsers() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(3, 1000 ether);
+
+        vm.warp(startTime);
+
+        // Prepare batch claim
+        address[] memory users = new address[](3);
+        users[0] = user1;
+        users[1] = user2;
+        users[2] = user3;
+
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 0; // Max
+        amounts[1] = 500 ether; // Partial
+        amounts[2] = 0; // Max
+
+        uint256 balance1Before = token.balanceOf(user1);
+        uint256 balance2Before = token.balanceOf(user2);
+        uint256 balance3Before = token.balanceOf(user3);
+
+        // Owner batch claims
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Manual distribution");
+
+        assertEq(token.balanceOf(user1) - balance1Before, 1000 ether);
+        assertEq(token.balanceOf(user2) - balance2Before, 500 ether);
+        assertEq(token.balanceOf(user3) - balance3Before, 1000 ether);
+    }
+
+    function test_ShouldAllowAuthorizedWalletToBatchClaim() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(2, 1000 ether);
+
+        vm.warp(startTime);
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 0;
+        amounts[1] = 0;
+
+        // Authorized wallet batch claims
+        vm.prank(admin);
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Authorized batch claim");
+
+        assertEq(token.balanceOf(user1), 1000 ether);
+        assertEq(token.balanceOf(user2), 1000 ether);
+    }
+
+    function test_RevertWhen_UnauthorizedBatchClaim() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(1, 1000 ether);
+
+        vm.warp(startTime);
+
+        address[] memory users = new address[](1);
+        users[0] = user1;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 0;
+
+        vm.prank(user2);
+        vm.expectRevert(UNAUTHORIZED_SELECTOR);
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Unauthorized claim");
+    }
+
+    function test_RevertWhen_BatchClaimArrayLengthMismatch() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        vm.warp(startTime);
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 0;
+
+        vm.expectRevert(ARRAY_LENGTH_MISMATCH_SELECTOR);
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Mismatched arrays");
+    }
+
+    function test_RevertWhen_BatchClaimExceedsMaxSize() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        vm.warp(startTime);
+
+        // Create arrays larger than MAX_CLAIM_BATCH_SIZE (1000)
+        uint256 batchSize = 1001;
+        address[] memory users = new address[](batchSize);
+        uint256[] memory amounts = new uint256[](batchSize);
+
+        vm.expectRevert(abi.encodeWithSelector(bytes4(keccak256("InvalidBatchSize(uint256,uint256)")), 1001, 1000));
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Too large");
+    }
+
+    function test_RevertWhen_BatchClaimWithBlacklistedUser() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(2, 1000 ether);
+
+        // Blacklist user2
+        claimdrop.blacklistAddress(user2, true);
+
+        vm.warp(startTime);
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 0;
+        amounts[1] = 0;
+
+        vm.expectRevert(abi.encodeWithSelector(BLACKLISTED_SELECTOR, user2));
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Batch with blacklisted");
+    }
+
+    function test_RevertWhen_BatchClaimWithNothingToClaim() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(2, 1000 ether);
+
+        vm.warp(startTime);
+
+        // First, user1 claims their allocation
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+
+        // Now try to batch claim including user1 who has nothing left
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 0;
+        amounts[1] = 0;
+
+        vm.expectRevert(NOTHING_TO_CLAIM_SELECTOR);
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Batch with nothing to claim");
+    }
+
+    function test_ShouldEmitBatchClaimedEvent() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime)
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(2, 1000 ether);
+
+        vm.warp(startTime);
+
+        address[] memory users = new address[](2);
+        users[0] = user1;
+        users[1] = user2;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 0;
+        amounts[1] = 0;
+
+        // Expect Claimed events for each user
+        vm.expectEmit(true, true, true, true);
+        emit Claimed(user1, 1000 ether, owner);
+        vm.expectEmit(true, true, true, true);
+        emit Claimed(user2, 1000 ether, owner);
+
+        // Expect BatchClaimed event
+        vm.expectEmit(true, true, true, true);
+        emit BatchClaimed(2, "Test memo", owner);
+
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Test memo");
+    }
+
+    // ============================================
     // View Functions Tests (4 tests)
     // ============================================
 
@@ -1151,7 +1508,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -1191,7 +1548,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0
@@ -1228,7 +1585,7 @@ contract ClaimdropTest is Test {
         distributions.push(
             Claimdrop.Distribution({
                 kind: Claimdrop.DistributionKind.LumpSum,
-                percentageBps: 10000,
+                percentageBps: 10_000,
                 startTime: uint64(startTime),
                 endTime: 0,
                 cliffDuration: 0

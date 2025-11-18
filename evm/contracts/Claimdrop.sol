@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Ownable2Step } from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import { Pausable } from "@openzeppelin/contracts/security/Pausable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Claimdrop
@@ -43,8 +43,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Maximum authorized wallets per batch operation
     uint256 public constant MAX_AUTHORIZED_WALLETS_BATCH_SIZE = 1000;
 
+    /// @notice Maximum claims per batch operation
+    uint256 public constant MAX_CLAIM_BATCH_SIZE = 1000;
+
     /// @notice Basis points representing 100%
-    uint256 public constant BASIS_POINTS_TOTAL = 10000;
+    uint256 public constant BASIS_POINTS_TOTAL = 10_000;
 
     // ============ Enums ============
 
@@ -127,6 +130,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Emitted when tokens are claimed
     event Claimed(address indexed user, uint256 indexed amount, address indexed sender);
 
+    /// @notice Emitted when batch claim is completed
+    event BatchClaimed(uint256 count, string memo, address indexed sender);
+
     /// @notice Emitted when an address is replaced
     event AddressReplaced(address indexed oldAddress, address indexed newAddress, uint256 indexed allocation);
 
@@ -208,7 +214,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         Distribution[] calldata distributions,
         uint64 startTime,
         uint64 endTime
-    ) external onlyAuthorized whenNotPaused {
+    )
+        external
+        onlyAuthorized
+        whenNotPaused
+    {
         if (campaign.exists) revert CampaignAlreadyExists();
         if (rewardToken == address(0)) revert ZeroAddress();
         if (totalReward == 0) revert ZeroAmount();
@@ -262,7 +272,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Add allocations in batch
     /// @param addresses Array of addresses
     /// @param amounts Array of allocation amounts
-    function addAllocations(address[] calldata addresses, uint256[] calldata amounts)
+    function addAllocations(
+        address[] calldata addresses,
+        uint256[] calldata amounts
+    )
         external
         onlyAuthorized
         whenNotPaused
@@ -353,59 +366,34 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param receiver Address to receive tokens
     /// @param amount Amount to claim (0 for maximum available)
     function claim(address receiver, uint256 amount) external nonReentrant whenNotPaused {
-        if (!campaign.exists) revert CampaignNotFound();
-        if (block.timestamp < campaign.startTime) revert CampaignNotStarted();
-        if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
         if (msg.sender != owner() && msg.sender != receiver) revert Unauthorized();
-        if (blacklist[receiver]) revert Blacklisted(receiver);
+        _claim(receiver, amount, msg.sender);
+    }
 
-        uint256 allocation = allocations[receiver];
-        if (allocation == 0) revert NoAllocation(receiver);
-
-        // Compute claimable amount
-        (uint256 claimable, uint256[] memory slotAmounts) = _computeClaimableAmount(receiver, allocation);
-
-        if (claimable == 0) revert NothingToClaim();
-
-        // Determine claim amount
-        uint256 claimAmount = amount == 0 ? claimable : amount;
-        if (claimAmount > claimable) {
-            revert ExceedsClaimable(claimAmount, claimable);
+    /// @notice Claim tokens on behalf of multiple users
+    /// @param users Array of user addresses
+    /// @param amounts Array of amounts to claim (0 for maximum available)
+    /// @param memo Memo describing the reason for batch claim
+    function claimOnBehalfOfBatch(
+        address[] calldata users,
+        uint256[] calldata amounts,
+        string calldata memo
+    )
+        external
+        onlyAuthorized
+        nonReentrant
+        whenNotPaused
+    {
+        if (users.length != amounts.length) revert ArrayLengthMismatch();
+        if (users.length == 0 || users.length > MAX_CLAIM_BATCH_SIZE) {
+            revert InvalidBatchSize(users.length, MAX_CLAIM_BATCH_SIZE);
         }
 
-        // Validate contract balance
-        uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
-        if (contractBalance < claimAmount) {
-            revert InsufficientBalance(claimAmount, contractBalance);
+        for (uint256 i = 0; i < users.length; i++) {
+            _claim(users[i], amounts[i], msg.sender);
         }
 
-        // Distribute to slots
-        uint256[] memory distribution = _distributeToSlots(claimAmount, slotAmounts);
-
-        // Update claims
-        for (uint256 i = 0; i < distribution.length; i++) {
-            if (distribution[i] > 0) {
-                Claim storage existingClaim = claims[receiver][i];
-                claims[receiver][i] = Claim({
-                    amountClaimed: uint128(uint256(existingClaim.amountClaimed) + distribution[i]),
-                    timestamp: uint64(block.timestamp)
-                });
-            }
-        }
-
-        // Update campaign claimed amount
-        campaign.claimed += claimAmount;
-
-        // Validate invariant
-        uint256 totalClaimed = _getTotalClaimedForAddress(receiver);
-        if (totalClaimed > allocation) {
-            revert ExceedsAllocation(totalClaimed, allocation);
-        }
-
-        // Transfer tokens
-        IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
-
-        emit Claimed(receiver, claimAmount, msg.sender);
+        emit BatchClaimed(users.length, memo, msg.sender);
     }
 
     // ============ Administration ============
@@ -538,7 +526,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param distributions Array of distributions
     /// @param startTime Campaign start time
     /// @param endTime Campaign end time
-    function _validateCampaignParams(Distribution[] calldata distributions, uint64 startTime, uint64 endTime)
+    function _validateCampaignParams(
+        Distribution[] calldata distributions,
+        uint64 startTime,
+        uint64 endTime
+    )
         internal
         view
     {
@@ -574,7 +566,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation User's total allocation
     /// @return claimable Total claimable amount
     /// @return slotAmounts Array of claimable per slot
-    function _computeClaimableAmount(address user, uint256 allocation)
+    function _computeClaimableAmount(
+        address user,
+        uint256 allocation
+    )
         internal
         view
         returns (uint256 claimable, uint256[] memory slotAmounts)
@@ -629,7 +624,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
     /// @return Claimable amount for this distribution
-    function _calculateLinearVesting(Distribution storage dist, uint256 allocation, Claim storage prevClaim)
+    function _calculateLinearVesting(
+        Distribution storage dist,
+        uint256 allocation,
+        Claim storage prevClaim
+    )
         internal
         view
         returns (uint256)
@@ -660,7 +659,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
     /// @return Claimable amount for this distribution
-    function _calculateLumpSum(Distribution storage dist, uint256 allocation, Claim storage prevClaim)
+    function _calculateLumpSum(
+        Distribution storage dist,
+        uint256 allocation,
+        Claim storage prevClaim
+    )
         internal
         view
         returns (uint256)
@@ -720,7 +723,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param amount Amount to distribute
     /// @param slotAmounts Available amounts per slot
     /// @return distribution Distribution per slot
-    function _distributeToSlots(uint256 amount, uint256[] memory slotAmounts)
+    function _distributeToSlots(
+        uint256 amount,
+        uint256[] memory slotAmounts
+    )
         internal
         view
         returns (uint256[] memory distribution)
@@ -759,5 +765,64 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         }
 
         return distribution;
+    }
+
+    /// @notice Internal claim logic
+    /// @param receiver Address to receive tokens
+    /// @param amount Amount to claim (0 for maximum available)
+    /// @param sender Address initiating the claim
+    function _claim(address receiver, uint256 amount, address sender) internal {
+        if (!campaign.exists) revert CampaignNotFound();
+        if (block.timestamp < campaign.startTime) revert CampaignNotStarted();
+        if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
+        if (blacklist[receiver]) revert Blacklisted(receiver);
+
+        uint256 allocation = allocations[receiver];
+        if (allocation == 0) revert NoAllocation(receiver);
+
+        // Compute claimable amount
+        (uint256 claimable, uint256[] memory slotAmounts) = _computeClaimableAmount(receiver, allocation);
+
+        if (claimable == 0) revert NothingToClaim();
+
+        // Determine claim amount
+        uint256 claimAmount = amount == 0 ? claimable : amount;
+        if (claimAmount > claimable) {
+            revert ExceedsClaimable(claimAmount, claimable);
+        }
+
+        // Validate contract balance
+        uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
+        if (contractBalance < claimAmount) {
+            revert InsufficientBalance(claimAmount, contractBalance);
+        }
+
+        // Distribute to slots
+        uint256[] memory distribution = _distributeToSlots(claimAmount, slotAmounts);
+
+        // Update claims
+        for (uint256 i = 0; i < distribution.length; i++) {
+            if (distribution[i] > 0) {
+                Claim storage existingClaim = claims[receiver][i];
+                claims[receiver][i] = Claim({
+                    amountClaimed: uint128(uint256(existingClaim.amountClaimed) + distribution[i]),
+                    timestamp: uint64(block.timestamp)
+                });
+            }
+        }
+
+        // Update campaign claimed amount
+        campaign.claimed += claimAmount;
+
+        // Validate invariant
+        uint256 totalClaimed = _getTotalClaimedForAddress(receiver);
+        if (totalClaimed > allocation) {
+            revert ExceedsAllocation(totalClaimed, allocation);
+        }
+
+        // Transfer tokens
+        IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
+
+        emit Claimed(receiver, claimAmount, sender);
     }
 }
