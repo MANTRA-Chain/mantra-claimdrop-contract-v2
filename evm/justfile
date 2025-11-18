@@ -199,127 +199,6 @@ deploy-local: (deploy "local")
 deploy-testnet: (deploy "dukong")
 deploy-mainnet: (deploy "mainnet")
 
-# Deploy upgradeable ClaimdropFactory to local Anvil node
-deploy-factory-local:
-    @echo "🏭 Deploying ClaimdropFactory (upgradeable) to local Anvil..."
-    @forge script script/DeployFactory.s.sol:DeployFactory --rpc-url http://localhost:8545 --broadcast
-
-# Deploy upgradeable ClaimdropFactory to MANTRA Dukong testnet
-deploy-factory-testnet:
-    #!/usr/bin/env bash
-    source .env
-    set -euo pipefail
-    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    echo "🏭 Deploying ClaimdropFactory (upgradeable) to MANTRA Dukong testnet..."
-    forge script script/DeployFactory.s.sol:DeployFactory \
-        --rpc-url $MANTRA_DUKONG_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Factory deployment complete!"
-    echo "📝 Save the ProxyAdmin and Proxy addresses for future upgrades!"
-
-# Deploy upgradeable ClaimdropFactory to MANTRA mainnet
-deploy-factory-mainnet:
-    #!/usr/bin/env bash
-    source .env
-    set -euo pipefail
-    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    echo "⚠️  Deploying ClaimdropFactory to MAINNET - please confirm"
-    read -p "Continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Deployment cancelled"
-        exit 1
-    fi
-    echo "🏭 Deploying ClaimdropFactory (upgradeable) to MANTRA mainnet..."
-    forge script script/DeployFactory.s.sol:DeployFactory \
-        --rpc-url $MANTRA_MAINNET_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Factory deployment complete!"
-    echo "📝 Save the ProxyAdmin and Proxy addresses for future upgrades!"
-
-# Upgrade ClaimdropFactory on MANTRA Dukong testnet
-upgrade-factory-testnet:
-    #!/usr/bin/env bash
-    source .env
-    set -euo pipefail
-    if [ -z "${MANTRA_DUKONG_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_DUKONG_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    if [ -z "${PROXY_ADDRESS:-}" ]; then
-        echo "❌ Error: PROXY_ADDRESS not set"
-        exit 1
-    fi
-    if [ -z "${PROXY_ADMIN_ADDRESS:-}" ]; then
-        echo "❌ Error: PROXY_ADMIN_ADDRESS not set"
-        exit 1
-    fi
-    echo "🔄 Upgrading ClaimdropFactory on MANTRA Dukong testnet..."
-    echo "   Proxy: $PROXY_ADDRESS"
-    echo "   ProxyAdmin: $PROXY_ADMIN_ADDRESS"
-    forge script script/UpgradeFactory.s.sol:UpgradeFactory \
-        --rpc-url $MANTRA_DUKONG_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Factory upgrade complete!"
-
-# Upgrade ClaimdropFactory on MANTRA mainnet
-upgrade-factory-mainnet:
-    #!/usr/bin/env bash
-    source .env
-    set -euo pipefail
-    if [ -z "${MANTRA_MAINNET_RPC_URL:-}" ]; then
-        echo "❌ Error: MANTRA_MAINNET_RPC_URL not set"
-        exit 1
-    fi
-    if [ -z "${PRIVATE_KEY:-}" ]; then
-        echo "❌ Error: PRIVATE_KEY not set"
-        exit 1
-    fi
-    if [ -z "${PROXY_ADDRESS:-}" ]; then
-        echo "❌ Error: PROXY_ADDRESS not set"
-        exit 1
-    fi
-    if [ -z "${PROXY_ADMIN_ADDRESS:-}" ]; then
-        echo "❌ Error: PROXY_ADMIN_ADDRESS not set"
-        exit 1
-    fi
-    echo "⚠️  Upgrading ClaimdropFactory on MAINNET - please confirm"
-    echo "   Proxy: $PROXY_ADDRESS"
-    echo "   ProxyAdmin: $PROXY_ADMIN_ADDRESS"
-    read -p "Continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Upgrade cancelled"
-        exit 1
-    fi
-    echo "🔄 Upgrading ClaimdropFactory on MANTRA mainnet..."
-    forge script script/UpgradeFactory.s.sol:UpgradeFactory \
-        --rpc-url $MANTRA_MAINNET_RPC_URL \
-        --private-key $PRIVATE_KEY \
-        --broadcast
-    echo "✅ Factory upgrade complete!"
-
 # Verify contract on block explorer
 verify CONTRACT_ADDRESS CHAIN="mantradukong":
     #!/usr/bin/env bash
@@ -345,30 +224,10 @@ ci:
     @echo "✅ CI pipeline complete!"
 
 # =============================================================================
-# E2E Testing (Fast, Local)
+# E2E Testing (Pure Cast Scripts)
 # =============================================================================
-
-# Run E2E test contract (fast, local only)
-e2e-test:
-    @echo "🧪 Running E2E tests..."
-    @forge test --match-contract E2EClaimdrop -vv
-    @echo "✅ E2E tests complete!"
-
-# Run E2E tests on forked network (read-only, no gas cost)
-e2e-fork NETWORK:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    just _validate-network {{NETWORK}}
-    RPC=$(just _get-rpc {{NETWORK}})
-
-    echo "🔱 Running E2E tests on {{NETWORK}} fork..."
-    echo "This is read-only and will not broadcast transactions"
-    echo ""
-    forge test --match-contract E2EClaimdrop \
-        --fork-url $RPC \
-        -vv
-    echo ""
-    echo "✅ Fork tests complete!"
+# Note: E2E testing is now done entirely with cast scripts (see e2e* commands below)
+# Forge tests are only used for unit testing individual contracts
 
 # =============================================================================
 # Pure Cast E2E Integration Testing (Cosmos SDK EVM Compatible)

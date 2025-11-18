@@ -3,7 +3,6 @@ src = "contracts"
 out = "out"
 libs = ["lib"]
 test = "test"
-script = "script"
 
 # Compiler settings
 solc = "0.8.24"
@@ -14,8 +13,11 @@ via_ir = true
 # Gas reporting
 gas_reports = ["*"]
 
-# File system permissions for E2E tests
-fs_permissions = [{ access = "read", path = "./config" }, { access = "read-write", path = "./out" }]
+# Exclude library tests from compilation
+skip = ["lib/*/test/**/*.sol", "lib/*/script/**/*.sol"]
+
+# File system permissions
+fs_permissions = [{ access = "read-write", path = "./out" }]
 
 # RPC endpoints
 [rpc_endpoints]
