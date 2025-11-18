@@ -9,4 +9,4 @@
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable
 [submodule "evm/lib/primary-sale"]
 	path = evm/lib/primary-sale
-	url = git@github.com:MANTRA-Finance/mantra-rwa-token-primary-sale-contract-v1
+	url = https://github.com/MANTRA-Finance/mantra-rwa-token-primary-sale-contract-v1
