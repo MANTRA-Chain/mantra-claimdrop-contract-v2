@@ -7,6 +7,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuar
 import { Pausable } from "@openzeppelin/contracts/security/Pausable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Allowlist } from "@primary-sale/Allowlist.sol";
 
 /**
  * @title Claimdrop
@@ -82,6 +83,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 claimed; // Total amount claimed so far
         uint64 closedAt; // Campaign closure timestamp (0 if open)
         bool exists; // Campaign was created
+        address allowlistContract; // Optional allowlist contract (address(0) = disabled)
     }
 
     /// @notice Claim record for a specific distribution slot
@@ -164,6 +166,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error NoAllocation(address addr);
     error AllocationExists(address addr);
     error Blacklisted(address addr);
+    error NotOnAllowlist(address addr);
     error CannotBlacklistOwner();
     error NothingToClaim();
     error ExceedsClaimable(uint256 requested, uint256 available);
@@ -213,7 +216,8 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 totalReward,
         Distribution[] calldata distributions,
         uint64 startTime,
-        uint64 endTime
+        uint64 endTime,
+        address allowlistContract
     )
         external
         onlyAuthorized
@@ -238,6 +242,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         campaign.claimed = 0;
         campaign.closedAt = 0;
         campaign.exists = true;
+        campaign.allowlistContract = allowlistContract;
 
         // Copy distributions
         delete campaign.distributions;
@@ -776,6 +781,13 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         if (block.timestamp < campaign.startTime) revert CampaignNotStarted();
         if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
         if (blacklist[receiver]) revert Blacklisted(receiver);
+
+        // Check allowlist if configured
+        if (campaign.allowlistContract != address(0)) {
+            if (!Allowlist(campaign.allowlistContract).isAllowed(receiver)) {
+                revert NotOnAllowlist(receiver);
+            }
+        }
 
         uint256 allocation = allocations[receiver];
         if (allocation == 0) revert NoAllocation(receiver);

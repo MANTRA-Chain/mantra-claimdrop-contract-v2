@@ -28,6 +28,7 @@ just deploy dukong         # Deploy to DuKong testnet
 - **Partial claims supported**
 - **Cliff periods for vesting**
 - **Blacklist functionality**
+- **Optional allowlist integration** (KYC/AML compliance)
 - **Authorized wallet management**
 - **Emergency pause functionality**
 
@@ -359,7 +360,7 @@ just test-gas
 
 ### Test Coverage
 
-The test suite includes **41 comprehensive tests** covering:
+The test suite includes **49 comprehensive tests** covering:
 
 - Deployment (3 tests)
 - Campaign Management (9 tests)
@@ -367,6 +368,7 @@ The test suite includes **41 comprehensive tests** covering:
 - Claiming (12 tests - lump sum, vesting, cliff, partial)
 - Administration (6 tests)
 - View Functions (4 tests)
+- Allowlist Integration (8 tests - compliance, batch operations, gas costs)
 
 ## Architecture
 
@@ -401,6 +403,115 @@ Approximate gas costs on MANTRA testnet:
 | Claim | ~130,000-140,000 |
 | Close Campaign | ~40,000 |
 
+## Allowlist Integration
+
+The Claimdrop contract supports optional allowlist integration for KYC/AML compliance and access control. When configured, users must be on the allowlist to claim tokens.
+
+### Allowlist Contract
+
+The implementation uses the production-ready [MANTRA Allowlist contract](https://github.com/MANTRA-Finance/mantra-rwa-token-primary-sale-contract-v1) from the primary-sale repository, which provides:
+
+- **Access Control**: Role-based permissions (DEFAULT_ADMIN_ROLE, COMPLIANCE_ROLE)
+- **Pausable**: Emergency pause functionality
+- **Batch Updates**: Efficient batch allowlist management via `setAllowedBatch()`
+- **Audit Trail**: Events for transparency (AllowlistUpdated, ContractPaused, ContractUnpaused)
+- **EIP-712**: Support for future off-chain signature verification
+
+### Setup
+
+The allowlist contract is included as a git submodule:
+
+```bash
+# Initialize submodules (if not already done)
+git submodule update --init --recursive
+
+# The Allowlist contract is available at:
+# evm/lib/primary-sale/packages/evm/contracts/Allowlist.sol
+```
+
+### Usage
+
+#### Creating a Campaign with Allowlist
+
+When creating a campaign, pass the allowlist contract address as the last parameter:
+
+```solidity
+// Deploy Allowlist contract
+Allowlist allowlist = new Allowlist(msg.sender);
+
+// Create campaign with allowlist enabled
+claimdrop.createCampaign(
+    "KYC Required Campaign",
+    "Only verified users can claim",
+    "airdrop",
+    rewardTokenAddress,
+    totalReward,
+    distributions,
+    startTime,
+    endTime,
+    address(allowlist)  // Enable allowlist
+);
+
+// To disable allowlist, pass address(0)
+claimdrop.createCampaign(..., address(0));
+```
+
+#### Managing the Allowlist
+
+```solidity
+// Add users to allowlist (batch operation)
+address[] memory users = new address[](3);
+users[0] = 0x123...;
+users[1] = 0x456...;
+users[2] = 0x789...;
+
+bool[] memory allowed = new bool[](3);
+allowed[0] = true;  // Allow
+allowed[1] = true;  // Allow
+allowed[2] = false; // Deny/Remove
+
+allowlist.setAllowedBatch(users, allowed);
+
+// Check if user is allowed
+bool isUserAllowed = allowlist.isAllowed(userAddress);
+```
+
+### Key Features
+
+**Optional Integration**: Set `address(0)` to disable allowlist checking (zero gas overhead)
+
+**Fail-Safe Design**: Invalid allowlist contracts cause claims to revert (prevents unauthorized access)
+
+**Blacklist Priority**: Blacklist check occurs before allowlist check (cheaper local storage access first)
+
+**Batch Compatibility**: Allowlist validation applies to both single claims and batch operations
+
+### Use Cases
+
+- **KYC/AML Compliance**: Only verified addresses can claim tokens
+- **Token Gating**: Restrict claims to specific token holders
+- **Partner Campaigns**: Limit access to partner community members
+- **Sybil Prevention**: Ensure only verified unique users can participate
+
+### Gas Costs
+
+| Operation | Gas Cost (without allowlist) | Gas Cost (with allowlist) | Overhead |
+|-----------|------------------------------|---------------------------|----------|
+| Claim | ~130-140k | ~210-250k | ~2,600 gas |
+| Batch Claim (100 users) | ~4.5M | ~4.76M | ~2,600 gas/user |
+
+The allowlist check adds approximately **2,600 gas per claim** (SLOAD + external view call).
+
+### Security Considerations
+
+**Allowlist Contract Reliability**: The allowlist contract is a critical dependency - ensure it's audited and trusted
+
+**Centralization Risk**: Allowlist management is controlled by addresses with COMPLIANCE_ROLE
+
+**Immutability**: Allowlist address cannot be changed after campaign creation
+
+**External Call Risks**: Failed allowlist contract calls will revert claims (fail-safe behavior)
+
 ## Security
 
 - Reentrancy protection on all external calls
@@ -408,6 +519,7 @@ Approximate gas costs on MANTRA testnet:
 - Two-step ownership transfer
 - Pausable for emergency situations
 - Comprehensive access control
+- Optional allowlist integration for KYC/AML compliance
 
 ## Configuration
 

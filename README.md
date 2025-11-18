@@ -23,7 +23,8 @@ MANTRA, a placeholder can be used for those addresses.
 are attached to the new address, same as the original allocation entry. The entries for the old wallet are removed.
 - Coin agnostic, any native coin is supported.
 - Ability to blacklist addresses (in case of hacked for instance). Blacklisted wallets cannot claim.
-- The owner (of the contract) is the only one able to do all permissioned actions, i.e. create a campaign, close a 
+- Optional allowlist integration (EVM only) for KYC/AML compliance and access control. When configured, only allowlisted addresses can claim tokens.
+- The owner (of the contract) is the only one able to do all permissioned actions, i.e. create a campaign, close a
 campaign, blacklist users, batch upload addresses.
 - Authorized wallet management. The owner can authorize specific wallets to perform admin actions like managing campaigns, adding allocations, and blacklisting addresses.
 - Ability to make partial claims. 
