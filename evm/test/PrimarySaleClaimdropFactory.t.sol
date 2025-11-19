@@ -47,11 +47,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         );
 
         // Deploy the proxy
-        proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
+        proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
 
         // Wrap the proxy in the factory interface
         factory = PrimarySaleClaimdropFactory(address(proxy));
@@ -182,10 +178,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
         // Upgrade the proxy to the new implementation
-        proxyAdmin.upgrade(
-            ITransparentUpgradeableProxy(address(proxy)),
-            address(newImplementation)
-        );
+        proxyAdmin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation));
 
         // Verify state is preserved
         assertEq(factory.getDeployedClaimdropsCount(), 1);
@@ -203,10 +196,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // User cannot upgrade
         vm.prank(user);
         vm.expectRevert();
-        proxyAdmin.upgrade(
-            ITransparentUpgradeableProxy(address(proxy)),
-            address(newImplementation)
-        );
+        proxyAdmin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation));
     }
 
     function testProxyAdminOwnership() public view {
@@ -330,4 +320,3 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         factory.resetFactory();
     }
 }
-

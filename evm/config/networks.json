@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "MANTRA Chain network configurations for multi-network E2E testing",
+  "networks": {
+    "local": {
+      "name": "Local Anvil",
+      "chainId": 31337,
+      "rpcUrl": "http://localhost:8545",
+      "explorerUrl": "",
+      "explorerApiUrl": "",
+      "faucetUrl": "",
+      "profile": "fast",
+      "blockTime": 0,
+      "description": "Local Anvil node for rapid development and testing"
+    },
+    "dukong": {
+      "name": "MANTRA DuKong Testnet",
+      "chainId": 5887,
+      "rpcUrl": "${MANTRA_DUKONG_RPC_URL}",
+      "explorerUrl": "https://mantrascan.io/dukong",
+      "explorerApiUrl": "https://evm.dukong.mantrachain.io/api",
+      "faucetUrl": "https://faucet.dukong.mantrachain.io",
+      "profile": "testnet",
+      "blockTime": 6,
+      "description": "Primary MANTRA testnet for realistic testing"
+    },
+    "canary": {
+      "name": "MANTRA Canary Staging Network",
+      "chainId": 7888,
+      "rpcUrl": "${MANTRA_CANARY_RPC_URL}",
+      "explorerUrl": "https://mantrascan.io/canary",
+      "explorerApiUrl": "https://evm.canary.mantrachain.dev/api",
+      "faucetUrl": "",
+      "profile": "staging",
+      "blockTime": 6,
+      "cosmosRpcUrl": "${MANTRA_CANARY_COSMOS_RPC}",
+      "cosmosChainId": "mantra-canary-net-1",
+      "description": "Pre-production staging network for final validation before mainnet",
+      "notes": "May require special access. Use fork testing if unavailable."
+    },
+    "mainnet": {
+      "name": "MANTRA Mainnet",
+      "chainId": 5888,
+      "rpcUrl": "${MANTRA_MAINNET_RPC_URL}",
+      "explorerUrl": "https://mantrascan.io",
+      "explorerApiUrl": "https://evm.mantrachain.io/api",
+      "faucetUrl": "",
+      "profile": "mainnet",
+      "blockTime": 6,
+      "cosmosRpcUrl": "${MANTRA_MAINNET_COSMOS_RPC}",
+      "cosmosChainId": "mantra-1",
+      "description": "MANTRA production network - use fork testing only"
+    }
+  },
+  "profiles": {
+    "fast": {
+      "name": "Fast Profile",
+      "description": "Minimal durations for rapid CI/local testing",
+      "campaignDuration": 300,
+      "vestingDuration": 600,
+      "startDelay": 10,
+      "cliffDuration": 30,
+      "lumpSumPercentageBps": 3000,
+      "vestingPercentageBps": 7000
+    },
+    "testnet": {
+      "name": "Testnet Profile",
+      "description": "Realistic but reasonable durations for testnet validation",
+      "campaignDuration": 3600,
+      "vestingDuration": 7200,
+      "startDelay": 60,
+      "cliffDuration": 300,
+      "lumpSumPercentageBps": 3000,
+      "vestingPercentageBps": 7000
+    },
+    "staging": {
+      "name": "Staging Profile",
+      "description": "Production-like durations for Canary pre-production testing",
+      "campaignDuration": 7200,
+      "vestingDuration": 14400,
+      "startDelay": 60,
+      "cliffDuration": 600,
+      "lumpSumPercentageBps": 2000,
+      "vestingPercentageBps": 8000
+    },
+    "mainnet": {
+      "name": "Mainnet Profile",
+      "description": "Realistic production durations (fork testing only)",
+      "campaignDuration": 86400,
+      "vestingDuration": 31536000,
+      "startDelay": 3600,
+      "cliffDuration": 7776000,
+      "lumpSumPercentageBps": 1000,
+      "vestingPercentageBps": 9000
+    }
+  }
+}

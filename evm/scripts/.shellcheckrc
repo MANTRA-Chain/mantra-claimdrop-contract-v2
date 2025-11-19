@@ -1,0 +1,51 @@
+# ShellCheck configuration for cast scripts
+# https://www.shellcheck.net/
+
+# Set shell dialect to bash
+shell=bash
+
+# Disable specific checks with rationale
+
+# SC1090: Can't follow non-constant source
+# Reason: We use dynamic sourcing with $SCRIPT_DIR which is legitimate
+disable=SC1090
+
+# SC1091: Not following sourced file
+# Reason: ShellCheck may not find files during CI or in different contexts
+disable=SC1091
+
+# SC2154: Variable is referenced but not assigned
+# Reason: Many variables come from sourced .env file or deployments.txt
+disable=SC2154
+
+# SC2250: Prefer putting braces around variable references
+# Reason: While good practice, enforcing this everywhere is overly pedantic
+# We use braces where necessary (ambiguity, special cases)
+disable=SC2250
+
+# SC2292: Prefer [[ ]] over [ ] for tests
+# Reason: Both are valid; [ ] is more portable. We use [[ ]] for regex/advanced features
+disable=SC2292
+
+# SC2312: Consider invoking command separately to avoid masking return value
+# Reason: Many intentional command chains (date formatting fallbacks)
+disable=SC2312
+
+# SC2248: Prefer double quoting even when variables don't contain special chars
+# Reason: We quote where necessary; enforcing everywhere reduces readability
+disable=SC2248
+
+# SC2310: Function invoked in condition disables set -e
+# Reason: This is intentional - we want to handle errors gracefully with || and if
+disable=SC2310
+
+# SC2153: Possible misspelling
+# Reason: Variables like RPC_URL are set by environment/sourced files
+disable=SC2153
+
+# SC2086: Double quote to prevent globbing
+# Reason: Many arithmetic operations don't need quotes; enforcing everywhere is pedantic
+disable=SC2086
+
+# Enable all optional checks for maximum code quality
+enable=all

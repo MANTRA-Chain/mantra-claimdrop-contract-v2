@@ -1,13 +1,11 @@
 node_modules
 .env
 .env.test
+.env.hybrid-e2e
 coverage
 coverage.json
 typechain
 typechain-types
-
-# Hardhat files (legacy)
-artifacts
 
 # Foundry files
 cache/
@@ -15,8 +13,10 @@ out/
 broadcast/
 foundry.lock
 
-# Test files
+# E2E testing
+deployments.txt
 test-allocations.json
+e2e-report.txt
 
 # IDE
 .idea
