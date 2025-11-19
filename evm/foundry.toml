@@ -3,9 +3,11 @@ src = "contracts"
 out = "out"
 libs = ["lib"]
 test = "test"
-script = "script"
+remappings = [
+    "@primary-sale/=lib/primary-sale/packages/evm/contracts/"
+]
 
-# Compiler settings (matching Hardhat config)
+# Compiler settings
 solc = "0.8.24"
 optimizer = true
 optimizer_runs = 200
@@ -14,15 +16,23 @@ via_ir = true
 # Gas reporting
 gas_reports = ["*"]
 
+# Exclude library tests from compilation
+skip = ["lib/*/test/**/*.sol", "lib/*/script/**/*.sol"]
+
+# File system permissions
+fs_permissions = [{ access = "read-write", path = "./out" }]
+
 # RPC endpoints
 [rpc_endpoints]
 mantra_dukong = "${MANTRA_DUKONG_RPC_URL}"
+mantra_canary = "${MANTRA_CANARY_RPC_URL}"
 mantra_mainnet = "${MANTRA_MAINNET_RPC_URL}"
 localhost = "http://localhost:8545"
 
 # Etherscan configuration for verification (MANTRA Explorer does not require API key)
 [etherscan]
 mantra_dukong = { key = "", url = "https://evm.dukong.mantrachain.io/api" }
+mantra_canary = { key = "", url = "https://evm.canary.mantrachain.dev/api" }
 mantra_mainnet = { key = "", url = "https://evm.mantrachain.io/api" }
 
 [fmt]

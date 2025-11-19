@@ -13,7 +13,6 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
         with:
-          submodules: recursive
           # A PR should not contain too many commits
           fetch-depth: 25
       - name: Validate commit messages
