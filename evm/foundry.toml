@@ -3,6 +3,9 @@ src = "contracts"
 out = "out"
 libs = ["lib"]
 test = "test"
+remappings = [
+    "@primary-sale/=lib/primary-sale/packages/evm/contracts/"
+]
 
 # Compiler settings
 solc = "0.8.24"

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import { Test, console } from "forge-std/Test.sol";
 import { Claimdrop } from "../contracts/Claimdrop.sol";
 import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
+import { Allowlist } from "@primary-sale/Allowlist.sol";
 
 /**
  * @title ClaimdropTest
@@ -13,6 +14,7 @@ contract ClaimdropTest is Test {
     // Contracts
     Claimdrop public claimdrop;
     MockERC20 public token;
+    Allowlist public allowlist;
 
     // Test accounts
     address public owner;
@@ -46,6 +48,7 @@ contract ClaimdropTest is Test {
     bytes4 constant CAMPAIGN_STARTED_SELECTOR = bytes4(keccak256("CampaignHasStarted()"));
     bytes4 constant INSUFFICIENT_BALANCE_SELECTOR = bytes4(keccak256("InsufficientBalance(uint256,uint256)"));
     bytes4 constant BLACKLISTED_SELECTOR = bytes4(keccak256("Blacklisted(address)"));
+    bytes4 constant NOT_ON_ALLOWLIST_SELECTOR = bytes4(keccak256("NotOnAllowlist(address)"));
     bytes4 constant CANNOT_BLACKLIST_OWNER_SELECTOR = bytes4(keccak256("CannotBlacklistOwner()"));
     bytes4 constant CAMPAIGN_CLOSED_SELECTOR = bytes4(keccak256("CampaignAlreadyClosed()"));
     bytes4 constant NOTHING_TO_CLAIM_SELECTOR = bytes4(keccak256("NothingToClaim()"));
@@ -76,6 +79,9 @@ contract ClaimdropTest is Test {
 
         // Deploy Claimdrop contract
         claimdrop = new Claimdrop(owner);
+
+        // Deploy Allowlist contract
+        allowlist = new Allowlist(owner);
 
         // Add admin as authorized wallet
         address[] memory admins = new address[](1);
@@ -132,7 +138,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         // Fund the contract
@@ -219,7 +226,7 @@ contract ClaimdropTest is Test {
     }
 
     function test_ShouldNotHaveCampaignInitially() public view {
-        (,,,,,,,,, bool exists) = claimdrop.campaign();
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
         assertFalse(exists);
     }
 
@@ -230,7 +237,7 @@ contract ClaimdropTest is Test {
     function test_ShouldCreateCampaignWithValidParameters() public {
         createTestCampaign();
 
-        (string memory name, string memory description,, address rewardToken, uint256 totalReward,,,,, bool exists) =
+        (string memory name, string memory description,, address rewardToken, uint256 totalReward,,,,, bool exists,) =
             claimdrop.campaign();
 
         assertTrue(exists);
@@ -256,7 +263,15 @@ contract ClaimdropTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(INVALID_PERCENTAGE_SUM_SELECTOR, 5000, 10_000));
         claimdrop.createCampaign(
-            "Test", "Test", "airdrop", address(token), 1000 ether, distributions, uint64(startTime), uint64(endTime)
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            1000 ether,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
         );
     }
 
@@ -276,7 +291,8 @@ contract ClaimdropTest is Test {
             1000 ether,
             distributions,
             uint64(pastTime),
-            uint64(endTime + 7200) // Adjust endTime too
+            uint64(endTime + 7200), // Adjust endTime too
+            address(0)
         );
     }
 
@@ -292,7 +308,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0)
         );
     }
 
@@ -308,10 +325,11 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
-        (,,,,,,,,, bool exists) = claimdrop.campaign();
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
         assertTrue(exists);
     }
 
@@ -321,7 +339,15 @@ contract ClaimdropTest is Test {
         vm.prank(user1);
         vm.expectRevert(UNAUTHORIZED_SELECTOR);
         claimdrop.createCampaign(
-            "Test", "Test", "airdrop", address(token), 1000 ether, distributions, uint64(startTime), uint64(endTime)
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            1000 ether,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
         );
     }
 
@@ -332,7 +358,7 @@ contract ClaimdropTest is Test {
         claimdrop.closeCampaign();
         uint256 balanceAfter = token.balanceOf(owner);
 
-        (,,,,,,,, uint64 closedAt,) = claimdrop.campaign();
+        (,,,,,,,, uint64 closedAt,,) = claimdrop.campaign();
         assertTrue(closedAt > 0);
         assertEq(balanceAfter - balanceBefore, CAMPAIGN_REWARD);
     }
@@ -378,7 +404,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         address[] memory addresses = new address[](3);
@@ -419,7 +446,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         vm.warp(startTime);
@@ -454,7 +482,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         address[] memory addresses = new address[](2);
@@ -488,7 +517,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         address[] memory addresses = new address[](1);
@@ -524,7 +554,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         address[] memory addresses = new address[](1);
@@ -560,7 +591,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         address[] memory addresses = new address[](1);
@@ -595,7 +627,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         address[] memory addresses = new address[](1);
@@ -636,7 +669,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -668,7 +702,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -705,7 +740,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -742,7 +778,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -786,7 +823,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -823,7 +861,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -863,7 +902,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -915,7 +955,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -958,7 +999,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -997,7 +1039,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1119,7 +1162,15 @@ contract ClaimdropTest is Test {
         // Should revert when paused
         vm.expectRevert(); // Pausable revert
         claimdrop.createCampaign(
-            "Test", "Test", "airdrop", address(token), 1000 ether, distributions, uint64(startTime), uint64(endTime)
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            1000 ether,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
         );
 
         claimdrop.unpause();
@@ -1133,10 +1184,11 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
-        (,,,,,,,,, bool exists) = claimdrop.campaign();
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
         assertTrue(exists);
     }
 
@@ -1165,7 +1217,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1217,7 +1270,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1262,7 +1316,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1301,7 +1356,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         vm.warp(startTime);
@@ -1337,7 +1393,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         vm.warp(startTime);
@@ -1372,7 +1429,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1415,7 +1473,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1460,7 +1519,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1495,7 +1555,7 @@ contract ClaimdropTest is Test {
     function test_ShouldReturnCorrectCampaignDetails() public {
         createTestCampaign();
 
-        (string memory name, string memory description,, address rewardToken,,,,,,) = claimdrop.campaign();
+        (string memory name, string memory description,, address rewardToken,,,,,,,) = claimdrop.campaign();
 
         assertEq(name, "Test Campaign");
         assertEq(description, "Test Description");
@@ -1523,7 +1583,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1563,7 +1624,8 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         token.transfer(address(claimdrop), CAMPAIGN_REWARD);
@@ -1600,11 +1662,337 @@ contract ClaimdropTest is Test {
             CAMPAIGN_REWARD,
             distributions,
             uint64(startTime),
-            uint64(endTime)
+            uint64(endTime),
+            address(0) // No allowlist by default
         );
 
         addTestAllocations(2, 1000 ether);
 
         assertEq(claimdrop.getInvestorCount(), 2);
+    }
+
+    // ============ Allowlist Integration Tests ============
+
+    /**
+     * @notice Test backward compatibility - campaigns without allowlist work as before
+     */
+    function test_ShouldAllowClaimWithoutAllowlist() public {
+        // Create campaign without allowlist (address(0))
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // user1 should be able to claim without being on any allowlist
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+
+        // Verify claim succeeded
+        assertGt(token.balanceOf(user1), 0);
+    }
+
+    /**
+     * @notice Test that whitelisted user can claim when allowlist is configured
+     */
+    function test_ShouldAllowClaimWithAllowlist() public {
+        createDefaultDistributions();
+
+        // Create campaign WITH allowlist
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(allowlist) // Enable allowlist
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(1, 1000 ether);
+
+        // Add user1 to allowlist
+        address[] memory addrs = new address[](1);
+        bool[] memory flags = new bool[](1);
+        addrs[0] = user1;
+        flags[0] = true;
+        allowlist.setAllowedBatch(addrs, flags);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // user1 should be able to claim
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+
+        // Verify claim succeeded
+        assertGt(token.balanceOf(user1), 0);
+    }
+
+    /**
+     * @notice Test that non-whitelisted user cannot claim when allowlist is configured
+     */
+    function test_RevertWhen_ClaimingNotOnAllowlist() public {
+        createDefaultDistributions();
+
+        // Create campaign WITH allowlist
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(allowlist) // Enable allowlist
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(1, 1000 ether);
+
+        // user1 is NOT on the allowlist
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // user1 should NOT be able to claim
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.NotOnAllowlist.selector, user1));
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+    }
+
+    /**
+     * @notice Test that blacklisted user cannot claim even if on allowlist
+     */
+    function test_RevertWhen_BlacklistedUserOnAllowlist() public {
+        createDefaultDistributions();
+
+        // Create campaign WITH allowlist
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(allowlist) // Enable allowlist
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(1, 1000 ether);
+
+        // Add user1 to allowlist
+        address[] memory addrs = new address[](1);
+        bool[] memory flags = new bool[](1);
+        addrs[0] = user1;
+        flags[0] = true;
+        allowlist.setAllowedBatch(addrs, flags);
+
+        // Blacklist user1
+        claimdrop.blacklistAddress(user1, true);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // user1 should be blocked by blacklist check (before allowlist check)
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.Blacklisted.selector, user1));
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+    }
+
+    /**
+     * @notice Test that batch claims respect allowlist for all users
+     */
+    function test_ShouldAllowBatchClaimWithAllowlist() public {
+        createDefaultDistributions();
+
+        // Create campaign WITH allowlist
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(allowlist) // Enable allowlist
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        // Add allocations for 3 users
+        address[] memory recipients = new address[](3);
+        recipients[0] = user1;
+        recipients[1] = user2;
+        recipients[2] = user3;
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 1000 ether;
+        amounts[1] = 1000 ether;
+        amounts[2] = 1000 ether;
+        claimdrop.addAllocations(recipients, amounts);
+
+        // Add all 3 users to allowlist
+        address[] memory addrs = new address[](3);
+        bool[] memory flags = new bool[](3);
+        addrs[0] = user1;
+        addrs[1] = user2;
+        addrs[2] = user3;
+        flags[0] = true;
+        flags[1] = true;
+        flags[2] = true;
+        allowlist.setAllowedBatch(addrs, flags);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // Batch claim should succeed for all allowed users
+        uint256[] memory claimAmounts = new uint256[](3);
+        claimAmounts[0] = 0;
+        claimAmounts[1] = 0;
+        claimAmounts[2] = 0;
+
+        claimdrop.claimOnBehalfOfBatch(recipients, claimAmounts, "batch claim");
+
+        // Verify all users received tokens
+        assertGt(token.balanceOf(user1), 0);
+        assertGt(token.balanceOf(user2), 0);
+        assertGt(token.balanceOf(user3), 0);
+    }
+
+    /**
+     * @notice Test that batch claim reverts if one user is not on allowlist
+     */
+    function test_RevertWhen_BatchClaimWithDeniedUser() public {
+        createDefaultDistributions();
+
+        // Create campaign WITH allowlist
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(allowlist) // Enable allowlist
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        // Add allocations for 3 users
+        address[] memory recipients = new address[](3);
+        recipients[0] = user1;
+        recipients[1] = user2;
+        recipients[2] = user3;
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = 1000 ether;
+        amounts[1] = 1000 ether;
+        amounts[2] = 1000 ether;
+        claimdrop.addAllocations(recipients, amounts);
+
+        // Add only user1 and user3 to allowlist (user2 is NOT allowed)
+        address[] memory addrs = new address[](2);
+        bool[] memory flags = new bool[](2);
+        addrs[0] = user1;
+        addrs[1] = user3;
+        flags[0] = true;
+        flags[1] = true;
+        allowlist.setAllowedBatch(addrs, flags);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // Batch claim should revert when it hits user2
+        uint256[] memory claimAmounts = new uint256[](3);
+        claimAmounts[0] = 0;
+        claimAmounts[1] = 0;
+        claimAmounts[2] = 0;
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.NotOnAllowlist.selector, user2));
+        claimdrop.claimOnBehalfOfBatch(recipients, claimAmounts, "batch claim");
+    }
+
+    /**
+     * @notice Test that invalid allowlist contract address causes revert
+     */
+    function test_RevertWhen_InvalidAllowlistContract() public {
+        createDefaultDistributions();
+
+        // Create campaign with invalid allowlist address (random EOA)
+        address invalidAllowlist = makeAddr("invalidAllowlist");
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            invalidAllowlist // Invalid allowlist contract
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(1, 1000 ether);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // Claim should revert when trying to call isAllowed on non-contract
+        vm.prank(user1);
+        vm.expectRevert(); // Generic revert from failed external call
+        claimdrop.claim(user1, 0);
+    }
+
+    /**
+     * @notice Test gas cost with allowlist enabled
+     * @dev This test measures the gas overhead of allowlist checks
+     */
+    function test_GasCostWithAllowlist() public {
+        createDefaultDistributions();
+
+        // Create campaign WITH allowlist
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(allowlist) // Enable allowlist
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+        addTestAllocations(1, 1000 ether);
+
+        // Add user1 to allowlist
+        address[] memory addrs = new address[](1);
+        bool[] memory flags = new bool[](1);
+        addrs[0] = user1;
+        flags[0] = true;
+        allowlist.setAllowedBatch(addrs, flags);
+
+        // Warp to start time
+        vm.warp(startTime);
+
+        // Measure gas for claim with allowlist
+        vm.prank(user1);
+        uint256 gasBefore = gasleft();
+        claimdrop.claim(user1, 0);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        // Gas should be reasonable (expected: ~200-250k gas with allowlist overhead)
+        // This is just a sanity check that it doesn't consume excessive gas
+        assertLt(gasUsed, 500_000, "Gas cost too high with allowlist");
     }
 }
