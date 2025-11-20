@@ -51,9 +51,6 @@ contract PrimarySaleClaimdropFactoryTest is Test {
 
         // Wrap the proxy in the factory interface
         factory = PrimarySaleClaimdropFactory(address(proxy));
-        
-        // Set mock PrimarySale address
-        factory.setPrimarySale(mockPrimarySale);
     }
 
     function testDeployClaimdrop() public {
@@ -302,7 +299,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         
         // Set new PrimarySale
         address newPrimarySale = address(0x888);
-        factory.setPrimarySale(newPrimarySale);
+        factory.setPrimarySaleWithMetadata(newPrimarySale, 100, 3, 48);
         
         // Should be able to deploy again
         address newClaimdrop = factory.deployClaimdrop();
