@@ -107,6 +107,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     error InvalidSlugFormat();
     error IndexOutOfBounds();
     error NotERC20Token();
+    error ActiveClaimdropExists();
 
     // ============ Constructor ============
 
@@ -139,21 +140,34 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     // ============ External Functions ============
 
     /// @notice Deploy a new Claimdrop contract
-    /// @dev Owner of the new Claimdrop will be the factory owner
+    /// @dev Owner of the new Claimdrop will be the msg.sender (EOA that calls this function)
     /// @dev Requires PrimarySale to be set before deploying Claimdrops
     /// @return claimdropAddress Address of the newly deployed Claimdrop
     function deployClaimdrop() external onlyOwner whenNotPaused returns (address claimdropAddress) {
         if (primarySale == address(0)) revert PrimarySaleNotSet();
+        // If a previous claimdrop exists and its campaign is not closed, prevent new deployment
+        if (deployedClaimdrops.length > 0) {
+            address last = deployedClaimdrops[deployedClaimdrops.length - 1];
+            if (last != address(0) && isClaimdrop[last]) {
+                // Query the Claimdrop for its campaign closedAt flag
+                try Claimdrop(last).getCampaign() returns (Claimdrop.Campaign memory campaign) {
+                    if (campaign.exists && campaign.closedAt == 0) revert ActiveClaimdropExists();
+                } catch {
+                    // If call fails for some reason, be conservative and prevent deployment
+                    revert ActiveClaimdropExists();
+                }
+            }
+        }
         
-        // Deploy new Claimdrop with factory owner as the owner
-        Claimdrop claimdrop = new Claimdrop(owner());
+        // Deploy new Claimdrop with msg.sender (EOA caller) as the owner
+        Claimdrop claimdrop = new Claimdrop(msg.sender);
         claimdropAddress = address(claimdrop);
 
         // Track the deployed contract
         deployedClaimdrops.push(claimdropAddress);
         isClaimdrop[claimdropAddress] = true;
 
-        emit ClaimdropDeployed(primarySale, claimdropAddress, owner(), deployedClaimdrops.length - 1);
+        emit ClaimdropDeployed(primarySale, claimdropAddress, msg.sender, deployedClaimdrops.length - 1);
     }
 
     /// @notice Set the PrimarySale contract address with metadata
