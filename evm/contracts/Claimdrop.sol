@@ -132,6 +132,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Track if address has allocation (for O(1) check)
     mapping(address => bool) private _hasAllocation;
 
+    /// @notice Track address position in _investors array for O(1) removal
+    mapping(address => uint256) private _investorIndex;
+
     // ============ Events ============
 
     /// @notice Emitted when a campaign is created
@@ -339,6 +342,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
             // Track investor
             if (!_hasAllocation[addr]) {
+                _investorIndex[addr] = _investors.length;
                 _investors.push(addr);
                 _hasAllocation[addr] = true;
             }
@@ -378,7 +382,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             delete blacklist[oldAddress];
         }
 
-        // Update investor tracking
+        // Update investor tracking (replace in array, don't push/pop)
+        uint256 index = _investorIndex[oldAddress];
+        _investors[index] = newAddress;
+        _investorIndex[newAddress] = index;
+        delete _investorIndex[oldAddress];
+
         _hasAllocation[newAddress] = true;
         _hasAllocation[oldAddress] = false;
 
@@ -395,6 +404,19 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         if (allocation == 0) revert NoAllocation(addr);
 
         delete allocations[addr];
+
+        // Remove from _investors array using swap-and-pop
+        uint256 index = _investorIndex[addr];
+        uint256 lastIndex = _investors.length - 1;
+
+        if (index != lastIndex) {
+            address lastInvestor = _investors[lastIndex];
+            _investors[index] = lastInvestor;
+            _investorIndex[lastInvestor] = index;
+        }
+
+        _investors.pop();
+        delete _investorIndex[addr];
         _hasAllocation[addr] = false;
 
         emit AddressRemoved(addr, allocation);
