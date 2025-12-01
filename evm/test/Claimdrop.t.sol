@@ -130,6 +130,9 @@ contract ClaimdropTest is Test {
     function createTestCampaign() internal {
         createDefaultDistributions();
 
+        // Fund the contract BEFORE creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -141,9 +144,6 @@ contract ClaimdropTest is Test {
             uint64(endTime),
             address(0) // No allowlist by default
         );
-
-        // Fund the contract
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
     }
 
     /**
@@ -323,6 +323,92 @@ contract ClaimdropTest is Test {
         );
     }
 
+    function test_RevertWhen_CampaignCreatedWithoutFunding() public {
+        createDefaultDistributions();
+
+        // Don't transfer tokens to contract
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.InsufficientCampaignFunding.selector, CAMPAIGN_REWARD, 0));
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_RevertWhen_CampaignPartiallyFunded() public {
+        createDefaultDistributions();
+
+        // Only transfer half the required amount
+        uint256 partialFunding = CAMPAIGN_REWARD / 2;
+        token.transfer(address(claimdrop), partialFunding);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Claimdrop.InsufficientCampaignFunding.selector, CAMPAIGN_REWARD, partialFunding)
+        );
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_ShouldCreateCampaignWhenExactlyFunded() public {
+        createDefaultDistributions();
+
+        // Transfer exact amount needed
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
+    function test_ShouldCreateCampaignWhenOverfunded() public {
+        createDefaultDistributions();
+
+        // Transfer more than needed
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD * 2);
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
     function test_ShouldAllowCampaignAtMaxDuration() public {
         // Set endTime to exactly 10 years (max allowed)
         uint64 maxEnd = uint64(startTime + 365 days * 10);
@@ -337,6 +423,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         // Should succeed
         claimdrop.createCampaign(
@@ -374,6 +463,9 @@ contract ClaimdropTest is Test {
 
     function test_ShouldAllowAuthorizedWalletToCreateCampaign() public {
         createDefaultDistributions();
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         vm.prank(admin);
         claimdrop.createCampaign(
@@ -524,6 +616,9 @@ contract ClaimdropTest is Test {
             );
         }
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Max Distributions",
             "Test",
@@ -563,6 +658,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Min Percentage",
@@ -689,6 +787,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Should succeed - distributions at exact boundaries
         claimdrop.createCampaign(
             "Boundary Test",
@@ -722,6 +823,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Test Campaign",
@@ -765,6 +869,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -801,6 +908,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -835,6 +945,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Test Campaign",
@@ -872,6 +985,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Test Campaign",
@@ -922,6 +1038,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -957,6 +1076,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Test Campaign",
@@ -1000,6 +1122,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1012,7 +1137,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.prank(user1);
@@ -1033,6 +1157,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1045,7 +1172,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.warp(startTime);
@@ -1071,6 +1197,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1083,7 +1212,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.warp(startTime);
@@ -1109,6 +1237,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1121,7 +1252,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.warp(startTime);
@@ -1154,6 +1284,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1166,7 +1299,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Blacklist user1
@@ -1192,6 +1324,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1204,7 +1339,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.warp(startTime);
@@ -1233,6 +1367,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1245,7 +1382,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Move slightly after start to begin vesting (1 second)
@@ -1286,6 +1422,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1298,7 +1437,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.warp(endTime);
@@ -1330,6 +1468,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1342,7 +1483,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // 15 days after start (mid-cliff)
@@ -1370,6 +1510,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1382,7 +1525,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // 31 days after start (cliff + 1 day)
@@ -1514,6 +1656,9 @@ contract ClaimdropTest is Test {
 
         claimdrop.unpause();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Should work after unpause
         claimdrop.createCampaign(
             "Test Campaign",
@@ -1548,6 +1693,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1560,7 +1708,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(3, 1000 ether);
 
         vm.warp(startTime);
@@ -1601,6 +1748,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1613,7 +1763,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(2, 1000 ether);
 
         vm.warp(startTime);
@@ -1647,6 +1796,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1659,7 +1811,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         vm.warp(startTime);
@@ -1686,6 +1837,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Test Campaign",
@@ -1724,6 +1878,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1760,6 +1917,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1772,7 +1932,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(2, 1000 ether);
 
         // Blacklist user2
@@ -1804,6 +1963,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1816,7 +1978,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(2, 1000 ether);
 
         vm.warp(startTime);
@@ -1850,6 +2011,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1862,7 +2026,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(2, 1000 ether);
 
         vm.warp(startTime);
@@ -1914,6 +2077,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1925,8 +2091,6 @@ contract ClaimdropTest is Test {
             uint64(endTime),
             address(0) // No allowlist by default
         );
-
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         // Set specific amounts
         address[] memory addresses = new address[](2);
@@ -1955,6 +2119,9 @@ contract ClaimdropTest is Test {
             })
         );
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         claimdrop.createCampaign(
             "Test Campaign",
             "Test Description",
@@ -1967,7 +2134,6 @@ contract ClaimdropTest is Test {
             address(0) // No allowlist by default
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Move to start time for lump sum to be available
@@ -1992,6 +2158,9 @@ contract ClaimdropTest is Test {
                 cliffDuration: 0
             })
         );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2037,6 +2206,9 @@ contract ClaimdropTest is Test {
     function test_ShouldAllowClaimWithAllowlist() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign WITH allowlist
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2050,7 +2222,6 @@ contract ClaimdropTest is Test {
             address(allowlist) // Enable allowlist
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Add user1 to allowlist
@@ -2077,6 +2248,9 @@ contract ClaimdropTest is Test {
     function test_RevertWhen_ClaimingNotOnAllowlist() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign WITH allowlist
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2090,7 +2264,6 @@ contract ClaimdropTest is Test {
             address(allowlist) // Enable allowlist
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // user1 is NOT on the allowlist
@@ -2110,6 +2283,9 @@ contract ClaimdropTest is Test {
     function test_RevertWhen_BlacklistedUserOnAllowlist() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign WITH allowlist
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2123,7 +2299,6 @@ contract ClaimdropTest is Test {
             address(allowlist) // Enable allowlist
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Add user1 to allowlist
@@ -2151,6 +2326,9 @@ contract ClaimdropTest is Test {
     function test_ShouldAllowBatchClaimWithAllowlist() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign WITH allowlist
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2163,8 +2341,6 @@ contract ClaimdropTest is Test {
             uint64(endTime),
             address(allowlist) // Enable allowlist
         );
-
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         // Add allocations for 3 users
         address[] memory recipients = new address[](3);
@@ -2211,6 +2387,9 @@ contract ClaimdropTest is Test {
     function test_RevertWhen_BatchClaimWithDeniedUser() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign WITH allowlist
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2223,8 +2402,6 @@ contract ClaimdropTest is Test {
             uint64(endTime),
             address(allowlist) // Enable allowlist
         );
-
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
 
         // Add allocations for 3 users
         address[] memory recipients = new address[](3);
@@ -2265,6 +2442,9 @@ contract ClaimdropTest is Test {
     function test_RevertWhen_InvalidAllowlistContract() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign with invalid allowlist address (random EOA)
         address invalidAllowlist = makeAddr("invalidAllowlist");
         claimdrop.createCampaign(
@@ -2279,7 +2459,6 @@ contract ClaimdropTest is Test {
             invalidAllowlist // Invalid allowlist contract
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Warp to start time
@@ -2298,6 +2477,9 @@ contract ClaimdropTest is Test {
     function test_GasCostWithAllowlist() public {
         createDefaultDistributions();
 
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
         // Create campaign WITH allowlist
         claimdrop.createCampaign(
             "Test Campaign",
@@ -2311,7 +2493,6 @@ contract ClaimdropTest is Test {
             address(allowlist) // Enable allowlist
         );
 
-        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
         addTestAllocations(1, 1000 ether);
 
         // Add user1 to allowlist
