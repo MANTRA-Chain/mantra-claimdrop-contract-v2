@@ -57,6 +57,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Basis points representing 100%
     uint256 public constant BASIS_POINTS_TOTAL = 10_000;
 
+    /// @notice Maximum campaign duration (10 years)
+    uint256 public constant MAX_CAMPAIGN_DURATION = 365 days * 10;
+
     // ============ Enums ============
 
     /// @notice Type of distribution
@@ -166,6 +169,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error CampaignNotEnded();
     error CampaignHasStarted();
     error InvalidTimeWindow();
+    error CampaignDurationTooLong(uint256 duration, uint256 maxDuration);
     error InvalidDistributions();
     error InvalidPercentageSum(uint256 actual, uint256 expected);
     error InvalidBatchSize(uint256 actual, uint256 max);
@@ -557,6 +561,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         // Validate time window
         if (startTime <= block.timestamp) revert InvalidTimeWindow();
         if (endTime <= startTime) revert InvalidTimeWindow();
+
+        // Validate campaign duration
+        uint256 duration = endTime - startTime;
+        if (duration > MAX_CAMPAIGN_DURATION) {
+            revert CampaignDurationTooLong(duration, MAX_CAMPAIGN_DURATION);
+        }
 
         // Validate percentages sum to 100%
         uint256 totalPercentage = 0;

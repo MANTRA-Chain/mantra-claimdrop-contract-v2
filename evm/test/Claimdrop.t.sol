@@ -296,6 +296,65 @@ contract ClaimdropTest is Test {
         );
     }
 
+    function test_RevertWhen_CampaignDurationExceedsMax() public {
+        createDefaultDistributions();
+
+        // Set endTime to 11 years from now (exceeds 10 year max)
+        uint64 farFutureEnd = uint64(block.timestamp + 365 days * 11);
+
+        // Update distribution times to match
+        distributions[0].startTime = uint64(startTime);
+        distributions[1].startTime = uint64(startTime);
+        distributions[1].endTime = farFutureEnd;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Claimdrop.CampaignDurationTooLong.selector, farFutureEnd - startTime, 365 days * 10)
+        );
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            farFutureEnd,
+            address(0)
+        );
+    }
+
+    function test_ShouldAllowCampaignAtMaxDuration() public {
+        // Set endTime to exactly 10 years (max allowed)
+        uint64 maxEnd = uint64(startTime + 365 days * 10);
+
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        // Should succeed
+        claimdrop.createCampaign(
+            "Max Duration Campaign",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            maxEnd,
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
     function test_RevertWhen_CreatingDuplicateCampaign() public {
         createTestCampaign();
 
