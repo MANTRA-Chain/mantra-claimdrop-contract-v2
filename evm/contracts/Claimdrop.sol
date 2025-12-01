@@ -178,6 +178,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error Unauthorized();
     error LumpSumStartAfterCampaignEnd(uint256 distributionIndex);
     error InvalidVestingPeriod(uint256 distributionIndex);
+    error SameAddress();
 
     // ============ Modifiers ============
 
@@ -321,6 +322,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     function replaceAddress(address oldAddress, address newAddress) external onlyAuthorized {
         if (oldAddress == address(0) || newAddress == address(0)) {
             revert ZeroAddress();
+        }
+        if (oldAddress == newAddress) {
+            revert SameAddress();
         }
 
         uint256 allocation = allocations[oldAddress];

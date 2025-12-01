@@ -2,10 +2,10 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Claimdrop} from "./Claimdrop.sol";
+import { Claimdrop } from "./Claimdrop.sol";
 
 /**
  * @title PrimarySaleClaimdropFactory
@@ -57,10 +57,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @param owner Owner of the Claimdrop (factory owner)
     /// @param index Index in the deployedClaimdrops array
     event ClaimdropDeployed(
-        address indexed primarySaleAddress,
-        address indexed claimdropAddress,
-        address indexed owner,
-        uint256 index
+        address indexed primarySaleAddress, address indexed claimdropAddress, address indexed owner, uint256 index
     );
 
     /// @notice Emitted when PrimarySale is set with metadata
@@ -80,18 +77,12 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @notice Emitted when receipt token is updated
     /// @param receiptTokenAddress Address of the receipt token
     /// @param admin Admin who set the receipt token
-    event ReceiptTokenSet(
-        address indexed receiptTokenAddress,
-        address indexed admin
-    );
+    event ReceiptTokenSet(address indexed receiptTokenAddress, address indexed admin);
 
     /// @notice Emitted when receipt token owner is updated
     /// @param receiptTokenOwnerAddress Address of the receipt token owner
     /// @param admin Admin who set the receipt token owner
-    event ReceiptTokenOwnerSet(
-        address indexed receiptTokenOwnerAddress,
-        address indexed admin
-    );
+    event ReceiptTokenOwnerSet(address indexed receiptTokenOwnerAddress, address indexed admin);
 
     /// @notice Emitted when factory is reset
     event FactoryReset();
@@ -125,8 +116,12 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         string memory name_,
         string memory slug_,
         string memory description_
-    ) public initializer {
-        __Ownable_init(initialOwner);
+    )
+        public
+        initializer
+    {
+        __Ownable_init();
+        _transferOwnership(initialOwner);
         __Pausable_init();
         _validateString(name_, 100);
         _validateSlug(slug_, 50);
@@ -144,7 +139,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @return claimdropAddress Address of the newly deployed Claimdrop
     function deployClaimdrop() external onlyOwner whenNotPaused returns (address claimdropAddress) {
         if (primarySale == address(0)) revert PrimarySaleNotSet();
-        
+
         // Deploy new Claimdrop with factory owner as the owner
         Claimdrop claimdrop = new Claimdrop(owner());
         claimdropAddress = address(claimdrop);
@@ -168,7 +163,11 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         uint256 rateInBps_,
         uint256 interestOnlyPeriod_,
         uint256 repaymentPeriod_
-    ) external onlyOwner whenNotPaused {
+    )
+        external
+        onlyOwner
+        whenNotPaused
+    {
         if (primarySale != address(0)) revert PrimarySaleAlreadyDeployed();
         if (primarySale_ == address(0)) revert InvalidAddress();
 
@@ -184,7 +183,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @param receiptToken_ Address of the receipt token contract
     function setReceiptToken(address receiptToken_) external onlyOwner {
         if (receiptToken_ == address(0)) revert InvalidAddress();
-        
+
         // Validate it's an ERC-20 token by checking if it implements totalSupply()
         try IERC20(receiptToken_).totalSupply() returns (uint256) {
             // Successfully called totalSupply, it's likely an ERC-20
@@ -199,7 +198,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @param receiptTokenOwner_ Address of the receipt token owner
     function setReceiptTokenOwner(address receiptTokenOwner_) external onlyOwner {
         if (receiptTokenOwner_ == address(0)) revert InvalidAddress();
-        
+
         receiptTokenOwner = receiptTokenOwner_;
         emit ReceiptTokenOwnerSet(receiptTokenOwner_, owner());
     }
@@ -240,11 +239,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
     /// @param name_ New name
     /// @param slug_ New slug
     /// @param description_ New description
-    function updateMetadata(
-        string memory name_,
-        string memory slug_,
-        string memory description_
-    ) external onlyOwner {
+    function updateMetadata(string memory name_, string memory slug_, string memory description_) external onlyOwner {
         _validateString(name_, 100);
         _validateSlug(slug_, 50);
         _validateString(description_, 500);
@@ -318,14 +313,14 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         bytes memory slugBytes = bytes(slug_);
         if (slugBytes.length == 0) revert EmptyString();
         if (slugBytes.length > maxLength) revert StringTooLong();
-        
+
         // Check each character is lowercase letter (a-z), number (0-9), or hyphen (-)
         for (uint256 i = 0; i < slugBytes.length; i++) {
             bytes1 char = slugBytes[i];
             bool isLowercase = char >= 0x61 && char <= 0x7A; // a-z
             bool isNumber = char >= 0x30 && char <= 0x39; // 0-9
             bool isHyphen = char == 0x2D; // -
-            
+
             if (!isLowercase && !isNumber && !isHyphen) {
                 revert InvalidSlugFormat();
             }
