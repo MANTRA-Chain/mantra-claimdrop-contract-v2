@@ -27,6 +27,11 @@ import { Allowlist } from "@primary-sale/Allowlist.sol";
  * - Rounding dust recovery
  * - Emergency pause functionality
  *
+ * LIMITATIONS:
+ * - Fee-on-transfer (FOT) tokens are NOT supported
+ * - Rebasing tokens are NOT supported
+ * - Only standard ERC20 tokens should be used as rewardToken
+ *
  * SECURITY:
  * - Reentrancy protection on all external calls
  * - Owner protection (cannot be blacklisted)
@@ -211,6 +216,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param distributions Array of distribution configurations
     /// @param startTime Campaign start timestamp
     /// @param endTime Campaign end timestamp
+    /// @param allowlistContract Optional allowlist contract address (address(0) to disable)
+    /// @dev IMPORTANT: Fee-on-transfer (FOT) tokens are NOT supported.
+    ///      Using FOT tokens will cause accounting mismatches where users
+    ///      receive less than the recorded claim amount.
     function createCampaign(
         string calldata name,
         string calldata description,

@@ -32,6 +32,25 @@ just deploy dukong         # Deploy to DuKong testnet
 - **Authorized wallet management**
 - **Emergency pause functionality**
 
+## Supported Tokens
+
+The Claimdrop contract is designed for **standard ERC20 tokens** only.
+
+### Supported
+- Standard ERC20 tokens (USDC, USDT, DAI, etc.)
+- ERC20 tokens with fixed supply
+- Wrapped native tokens (WETH, WMATIC, etc.)
+
+### NOT Supported
+- **Fee-on-transfer (FOT) tokens**: Tokens that charge a fee on every transfer. Using these will cause accounting mismatches.
+- **Rebasing tokens**: Tokens that automatically adjust balances (like stETH). The contract tracks fixed amounts.
+- **Tokens with blacklists**: External blacklists may block transfers. Use the contract's built-in blacklist instead.
+
+Using unsupported token types may result in:
+- Users receiving less than displayed claim amounts
+- Failed claims due to balance mismatches
+- Incorrect accounting in events and state
+
 ## Tech Stack
 
 - **Framework**: Foundry (Rust-based Solidity development toolkit)
