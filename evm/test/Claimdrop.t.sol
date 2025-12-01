@@ -2515,4 +2515,92 @@ contract ClaimdropTest is Test {
         // This is just a sanity check that it doesn't consume excessive gas
         assertLt(gasUsed, 500_000, "Gas cost too high with allowlist");
     }
+
+    // ============================================
+    // Investor Array Tracking Tests (4 tests)
+    // ============================================
+
+    /**
+     * @notice Test that investor count is accurate after removals
+     */
+    function test_InvestorCountAccurateAfterRemoval() public {
+        createTestCampaign();
+        addTestAllocations(3, 1000 ether); // user1, user2, user3
+
+        assertEq(claimdrop.getInvestorCount(), 3);
+
+        // Remove user2
+        claimdrop.removeAddress(user2);
+
+        assertEq(claimdrop.getInvestorCount(), 2);
+
+        // Remove user1
+        claimdrop.removeAddress(user1);
+
+        assertEq(claimdrop.getInvestorCount(), 1);
+    }
+
+    /**
+     * @notice Test that no duplicates are created when re-adding a removed address
+     */
+    function test_NoInvestorDuplicatesAfterReAdd() public {
+        createTestCampaign();
+
+        // Add user1
+        address[] memory addrs = new address[](1);
+        uint256[] memory amts = new uint256[](1);
+        addrs[0] = user1;
+        amts[0] = 1000 ether;
+        claimdrop.addAllocations(addrs, amts);
+
+        assertEq(claimdrop.getInvestorCount(), 1);
+
+        // Remove user1
+        claimdrop.removeAddress(user1);
+        assertEq(claimdrop.getInvestorCount(), 0);
+
+        // Re-add user1
+        claimdrop.addAllocations(addrs, amts);
+
+        // Should still be 1, not 2
+        assertEq(claimdrop.getInvestorCount(), 1);
+    }
+
+    /**
+     * @notice Test that investor array is updated correctly on replace
+     */
+    function test_InvestorArrayUpdatedOnReplace() public {
+        createTestCampaign();
+        addTestAllocations(2, 1000 ether); // user1, user2
+
+        assertEq(claimdrop.getInvestorCount(), 2);
+
+        // Replace user1 with user3
+        claimdrop.replaceAddress(user1, user3);
+
+        // Count should remain 2
+        assertEq(claimdrop.getInvestorCount(), 2);
+
+        // user3 should have allocation, user1 should not
+        assertEq(claimdrop.allocations(user3), 1000 ether);
+        assertEq(claimdrop.allocations(user1), 0);
+    }
+
+    /**
+     * @notice Test that swap-and-pop removes correctly from middle of array
+     */
+    function test_SwapAndPopRemovesCorrectly() public {
+        createTestCampaign();
+        addTestAllocations(3, 1000 ether); // user1, user2, user3
+
+        // Remove middle element (user2)
+        claimdrop.removeAddress(user2);
+
+        assertEq(claimdrop.getInvestorCount(), 2);
+
+        // Verify remaining users still have allocations
+        assertEq(claimdrop.allocations(user1), 1000 ether);
+        assertEq(claimdrop.allocations(user3), 1000 ether);
+        assertEq(claimdrop.allocations(user2), 0);
+    }
 }
