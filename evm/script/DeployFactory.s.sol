@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console} from "forge-std/Script.sol";
-import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { Script, console } from "forge-std/Script.sol";
+import { PrimarySaleClaimdropFactory } from "../contracts/PrimarySaleClaimdropFactory.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 /**
  * @title DeployFactory
@@ -39,17 +39,13 @@ contract DeployFactory is Script {
         string memory factoryDescription = "Factory for deploying and managing Claimdrop and PrimarySale contracts";
 
         bytes memory initData = abi.encodeCall(
-            PrimarySaleClaimdropFactory.initialize,
-            (factoryAdmin, factoryName, factorySlug, factoryDescription)
+            PrimarySaleClaimdropFactory.initialize, (factoryAdmin, factoryName, factorySlug, factoryDescription)
         );
 
         // 4. Deploy the TransparentUpgradeableProxy with ProxyAdmin contract as admin
         console.log("\n4. Deploying TransparentUpgradeableProxy...");
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(implementation),
-            address(proxyAdmin),
-            initData
-        );
+        TransparentUpgradeableProxy proxy =
+            new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
         console.log("Proxy deployed to:", address(proxy));
 
         vm.stopBroadcast();
