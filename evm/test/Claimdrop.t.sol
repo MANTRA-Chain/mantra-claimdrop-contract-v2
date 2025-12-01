@@ -580,6 +580,132 @@ contract ClaimdropTest is Test {
         assertTrue(exists);
     }
 
+    function test_RevertWhen_VestingStartsBeforeCampaign() public {
+        delete distributions;
+
+        // Vesting starts 1 hour before campaign
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime - 3600), // 1 hour before campaign
+                endTime: uint64(endTime),
+                cliffDuration: 0
+            })
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.DistributionOutsideCampaign.selector, 0));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_RevertWhen_VestingEndsAfterCampaign() public {
+        delete distributions;
+
+        // Vesting ends 1 day after campaign
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: uint64(endTime + 1 days), // After campaign end
+                cliffDuration: 0
+            })
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.DistributionOutsideCampaign.selector, 0));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_RevertWhen_LumpSumBeforeCampaignStart() public {
+        delete distributions;
+
+        // LumpSum releases before campaign starts
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime - 3600), // Before campaign start
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.DistributionOutsideCampaign.selector, 0));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_ShouldAllowDistributionAtCampaignBoundaries() public {
+        delete distributions;
+
+        // LumpSum at exact campaign start
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 3000,
+                startTime: uint64(startTime), // Exact campaign start
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        // Vesting from start to end exactly
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 7000,
+                startTime: uint64(startTime), // Exact campaign start
+                endTime: uint64(endTime), // Exact campaign end
+                cliffDuration: 0
+            })
+        );
+
+        // Should succeed - distributions at exact boundaries
+        claimdrop.createCampaign(
+            "Boundary Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
     // ============================================
     // Allocation Management Tests (7 tests)
     // ============================================

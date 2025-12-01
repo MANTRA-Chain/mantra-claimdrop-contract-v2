@@ -198,6 +198,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error SameAddress();
     error TooManyDistributions(uint256 count, uint256 max);
     error DistributionPercentageTooLow(uint256 index, uint256 bps, uint256 min);
+    error DistributionOutsideCampaign(uint256 index);
 
     // ============ Modifiers ============
 
@@ -593,13 +594,18 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
             // Validate distribution times
             if (distributions[i].kind == DistributionKind.LinearVesting) {
+                // Validate vesting period is positive
                 if (distributions[i].endTime <= distributions[i].startTime) {
                     revert InvalidVestingPeriod(i);
                 }
+                // Validate vesting is within campaign bounds
+                if (distributions[i].startTime < startTime || distributions[i].endTime > endTime) {
+                    revert DistributionOutsideCampaign(i);
+                }
             } else {
-                // LumpSum: startTime must be <= campaign.endTime
-                if (distributions[i].startTime > endTime) {
-                    revert LumpSumStartAfterCampaignEnd(i);
+                // LumpSum: startTime must be within campaign window
+                if (distributions[i].startTime < startTime || distributions[i].startTime > endTime) {
+                    revert DistributionOutsideCampaign(i);
                 }
             }
         }
