@@ -60,6 +60,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Maximum campaign duration (10 years)
     uint256 public constant MAX_CAMPAIGN_DURATION = 365 days * 10;
 
+    /// @notice Maximum number of distributions per campaign
+    uint256 public constant MAX_DISTRIBUTIONS = 10;
+
+    /// @notice Minimum percentage per distribution (1%)
+    uint256 public constant MIN_DISTRIBUTION_BPS = 100;
+
     // ============ Enums ============
 
     /// @notice Type of distribution
@@ -190,6 +196,8 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error LumpSumStartAfterCampaignEnd(uint256 distributionIndex);
     error InvalidVestingPeriod(uint256 distributionIndex);
     error SameAddress();
+    error TooManyDistributions(uint256 count, uint256 max);
+    error DistributionPercentageTooLow(uint256 index, uint256 bps, uint256 min);
 
     // ============ Modifiers ============
 
@@ -568,9 +576,19 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             revert CampaignDurationTooLong(duration, MAX_CAMPAIGN_DURATION);
         }
 
-        // Validate percentages sum to 100%
+        // Validate distribution count
+        if (distributions.length > MAX_DISTRIBUTIONS) {
+            revert TooManyDistributions(distributions.length, MAX_DISTRIBUTIONS);
+        }
+
+        // Validate percentages sum to 100% and each meets minimum
         uint256 totalPercentage = 0;
         for (uint256 i = 0; i < distributions.length; i++) {
+            // Check minimum percentage
+            if (distributions[i].percentageBps < MIN_DISTRIBUTION_BPS) {
+                revert DistributionPercentageTooLow(i, distributions[i].percentageBps, MIN_DISTRIBUTION_BPS);
+            }
+
             totalPercentage += distributions[i].percentageBps;
 
             // Validate distribution times
