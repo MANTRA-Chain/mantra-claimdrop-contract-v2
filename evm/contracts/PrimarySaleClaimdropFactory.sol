@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Claimdrop } from "./Claimdrop.sol";
@@ -120,8 +120,7 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
         public
         initializer
     {
-        __Ownable_init();
-        _transferOwnership(initialOwner);
+        __Ownable_init(initialOwner);
         __Pausable_init();
         _validateString(name_, 100);
         _validateSlug(slug_, 50);
