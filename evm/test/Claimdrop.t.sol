@@ -1106,6 +1106,99 @@ contract ClaimdropTest is Test {
     }
 
     // ============================================
+    // Allocation Tracking Tests (5 tests)
+    // ============================================
+
+    function test_RevertWhen_AllocationsExceedTotalReward() public {
+        createTestCampaign(); // totalReward = CAMPAIGN_REWARD (1M tokens)
+
+        // Try to allocate more than total reward
+        address[] memory addrs = new address[](2);
+        uint256[] memory amts = new uint256[](2);
+        addrs[0] = user1;
+        addrs[1] = user2;
+        amts[0] = CAMPAIGN_REWARD; // 1M tokens
+        amts[1] = 1 ether; // 1 more token = over limit
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Claimdrop.AllocationExceedsTotalReward.selector, CAMPAIGN_REWARD + 1 ether, CAMPAIGN_REWARD
+            )
+        );
+        claimdrop.addAllocations(addrs, amts);
+    }
+
+    function test_ShouldAllowExactTotalRewardAllocation() public {
+        createTestCampaign();
+
+        // Allocate exactly total reward
+        address[] memory addrs = new address[](2);
+        uint256[] memory amts = new uint256[](2);
+        addrs[0] = user1;
+        addrs[1] = user2;
+        amts[0] = CAMPAIGN_REWARD / 2;
+        amts[1] = CAMPAIGN_REWARD / 2;
+
+        claimdrop.addAllocations(addrs, amts);
+
+        assertEq(claimdrop.totalAllocated(), CAMPAIGN_REWARD);
+    }
+
+    function test_ShouldAllowUnderallocation() public {
+        createTestCampaign();
+
+        // Only allocate 50% of total reward
+        address[] memory addrs = new address[](1);
+        uint256[] memory amts = new uint256[](1);
+        addrs[0] = user1;
+        amts[0] = CAMPAIGN_REWARD / 2;
+
+        claimdrop.addAllocations(addrs, amts);
+
+        assertEq(claimdrop.totalAllocated(), CAMPAIGN_REWARD / 2);
+        // Should be allowed - under-allocation is fine
+    }
+
+    function test_TotalAllocatedDecrementsOnRemove() public {
+        createTestCampaign();
+
+        // Add allocation
+        address[] memory addrs = new address[](1);
+        uint256[] memory amts = new uint256[](1);
+        addrs[0] = user1;
+        amts[0] = 100_000 ether;
+
+        claimdrop.addAllocations(addrs, amts);
+        assertEq(claimdrop.totalAllocated(), 100_000 ether);
+
+        // Remove allocation
+        claimdrop.removeAddress(user1);
+        assertEq(claimdrop.totalAllocated(), 0);
+    }
+
+    function test_CanReallocateAfterRemoval() public {
+        createTestCampaign();
+
+        // Allocate full amount to user1
+        address[] memory addrs = new address[](1);
+        uint256[] memory amts = new uint256[](1);
+        addrs[0] = user1;
+        amts[0] = CAMPAIGN_REWARD;
+
+        claimdrop.addAllocations(addrs, amts);
+        assertEq(claimdrop.totalAllocated(), CAMPAIGN_REWARD);
+
+        // Remove user1
+        claimdrop.removeAddress(user1);
+        assertEq(claimdrop.totalAllocated(), 0);
+
+        // Reallocate to user2 (should work since totalAllocated is now 0)
+        addrs[0] = user2;
+        claimdrop.addAllocations(addrs, amts);
+        assertEq(claimdrop.totalAllocated(), CAMPAIGN_REWARD);
+    }
+
+    // ============================================
     // Claiming Tests - Lump Sum (6 tests)
     // ============================================
 
