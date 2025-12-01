@@ -7,6 +7,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuar
 import { Pausable } from "@openzeppelin/contracts/security/Pausable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { Allowlist } from "@primary-sale/Allowlist.sol";
 
 /**
@@ -35,6 +36,7 @@ import { Allowlist } from "@primary-sale/Allowlist.sol";
  */
 contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
+    using SafeCast for uint256;
 
     // ============ Constants ============
 
@@ -821,7 +823,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             if (distribution[i] > 0) {
                 Claim storage existingClaim = claims[receiver][i];
                 claims[receiver][i] = Claim({
-                    amountClaimed: uint128(uint256(existingClaim.amountClaimed) + distribution[i]),
+                    amountClaimed: (uint256(existingClaim.amountClaimed) + distribution[i]).toUint128(),
                     timestamp: uint64(block.timestamp)
                 });
             }
