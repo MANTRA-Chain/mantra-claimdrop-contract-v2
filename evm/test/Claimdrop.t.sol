@@ -570,6 +570,18 @@ contract ClaimdropTest is Test {
         assertEq(claimdrop.getAllocation(user2), 1000 ether);
     }
 
+    function test_RevertWhen_ReplacingAddressWithSelf() public {
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // Attempt to replace user1 with itself
+        vm.expectRevert(abi.encodeWithSignature("SameAddress()"));
+        claimdrop.replaceAddress(user1, user1);
+
+        // Verify allocation still intact
+        assertEq(claimdrop.allocations(user1), 1000 ether);
+    }
+
     function test_ShouldRemoveAddressCorrectly() public {
         // Create campaign with 100% lump sum
         delete distributions;

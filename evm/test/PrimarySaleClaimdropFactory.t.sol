@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {PrimarySaleClaimdropFactory} from "../contracts/PrimarySaleClaimdropFactory.sol";
-import {Claimdrop} from "../contracts/Claimdrop.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { Test } from "forge-std/Test.sol";
+import { PrimarySaleClaimdropFactory } from "../contracts/PrimarySaleClaimdropFactory.sol";
+import { Claimdrop } from "../contracts/Claimdrop.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ITransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 contract PrimarySaleClaimdropFactoryTest is Test {
     PrimarySaleClaimdropFactory public factory;
@@ -19,10 +19,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
     address public mockPrimarySale;
 
     event ClaimdropDeployed(
-        address indexed primarySaleAddress,
-        address indexed claimdropAddress,
-        address indexed owner,
-        uint256 index
+        address indexed primarySaleAddress, address indexed claimdropAddress, address indexed owner, uint256 index
     );
 
     function setUp() public {
@@ -233,7 +230,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
     function testCannotDeployClaimdropWithoutPrimarySale() public {
         // Deploy a fresh factory without PrimarySale set
         PrimarySaleClaimdropFactory freshImplementation = new PrimarySaleClaimdropFactory();
-        
+
         bytes memory initData = abi.encodeWithSelector(
             PrimarySaleClaimdropFactory.initialize.selector,
             owner,
@@ -241,15 +238,12 @@ contract PrimarySaleClaimdropFactoryTest is Test {
             "fresh-factory",
             "Fresh factory without PrimarySale"
         );
-        
-        TransparentUpgradeableProxy freshProxy = new TransparentUpgradeableProxy(
-            address(freshImplementation),
-            address(proxyAdmin),
-            initData
-        );
-        
+
+        TransparentUpgradeableProxy freshProxy =
+            new TransparentUpgradeableProxy(address(freshImplementation), address(proxyAdmin), initData);
+
         PrimarySaleClaimdropFactory freshFactory = PrimarySaleClaimdropFactory(address(freshProxy));
-        
+
         // Should revert because PrimarySale is not set
         vm.expectRevert(PrimarySaleClaimdropFactory.PrimarySaleNotSet.selector);
         freshFactory.deployClaimdrop();
@@ -267,17 +261,17 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // Deploy some claimdrops
         address claimdrop1 = factory.deployClaimdrop();
         address claimdrop2 = factory.deployClaimdrop();
-        
+
         // Verify state before reset
         assertEq(factory.getDeployedClaimdropsCount(), 2);
         assertTrue(factory.isClaimdrop(claimdrop1));
         assertTrue(factory.isClaimdrop(claimdrop2));
         assertEq(factory.getPrimarySale(), mockPrimarySale);
         assertTrue(factory.isPrimarySaleDeployed());
-        
+
         // Reset factory
         factory.resetFactory();
-        
+
         // Verify state after reset
         assertEq(factory.getDeployedClaimdropsCount(), 0);
         assertFalse(factory.isClaimdrop(claimdrop1));
@@ -296,11 +290,11 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // Deploy and reset
         factory.deployClaimdrop();
         factory.resetFactory();
-        
+
         // Set new PrimarySale
         address newPrimarySale = address(0x888);
         factory.setPrimarySaleWithMetadata(newPrimarySale, 100, 3, 48);
-        
+
         // Should be able to deploy again
         address newClaimdrop = factory.deployClaimdrop();
         assertTrue(newClaimdrop != address(0));
@@ -311,7 +305,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
     function testResetNotAllowedOnMainnet() public {
         // Simulate MANTRA mainnet (chain ID 5888)
         vm.chainId(5888);
-        
+
         // Should revert when trying to reset on mainnet
         vm.expectRevert(PrimarySaleClaimdropFactory.ResetNotAllowedOnMainnet.selector);
         factory.resetFactory();
