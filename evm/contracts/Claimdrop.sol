@@ -199,6 +199,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error TooManyDistributions(uint256 count, uint256 max);
     error DistributionPercentageTooLow(uint256 index, uint256 bps, uint256 min);
     error DistributionOutsideCampaign(uint256 index);
+    error InsufficientCampaignFunding(uint256 required, uint256 balance);
 
     // ============ Modifiers ============
 
@@ -255,6 +256,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
         // Validate campaign parameters
         _validateCampaignParams(distributions, startTime, endTime);
+
+        // Validate sufficient funding
+        uint256 balance = IERC20(rewardToken).balanceOf(address(this));
+        if (balance < totalReward) {
+            revert InsufficientCampaignFunding(totalReward, balance);
+        }
 
         // Create campaign
         campaign.name = name;
