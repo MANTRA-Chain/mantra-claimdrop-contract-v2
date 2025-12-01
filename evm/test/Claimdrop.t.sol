@@ -438,6 +438,148 @@ contract ClaimdropTest is Test {
         claimdrop.closeCampaign();
     }
 
+    function test_RevertWhen_TooManyDistributions() public {
+        delete distributions;
+
+        // Create 11 distributions (1 over max)
+        for (uint256 i = 0; i < 11; i++) {
+            distributions.push(
+                Claimdrop.Distribution({
+                    kind: Claimdrop.DistributionKind.LumpSum,
+                    percentageBps: 909, // ~9.09% each, will sum close to 10000
+                    startTime: uint64(startTime),
+                    endTime: 0,
+                    cliffDuration: 0
+                })
+            );
+        }
+        // Adjust last one to hit exactly 10000
+        distributions[10].percentageBps = 910;
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.TooManyDistributions.selector, 11, 10));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_RevertWhen_DistributionPercentageTooLow() public {
+        delete distributions;
+
+        // 99 bps is below 100 minimum
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 99,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 9901,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.DistributionPercentageTooLow.selector, 0, 99, 100));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_ShouldAllowMaxDistributions() public {
+        delete distributions;
+
+        // Create exactly 10 distributions (max allowed)
+        for (uint256 i = 0; i < 10; i++) {
+            distributions.push(
+                Claimdrop.Distribution({
+                    kind: Claimdrop.DistributionKind.LumpSum,
+                    percentageBps: 1000, // 10% each = 100%
+                    startTime: uint64(startTime),
+                    endTime: 0,
+                    cliffDuration: 0
+                })
+            );
+        }
+
+        claimdrop.createCampaign(
+            "Max Distributions",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
+    function test_ShouldAllowMinimumPercentage() public {
+        delete distributions;
+
+        // Use exactly 100 bps (minimum)
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 100,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 9900,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        claimdrop.createCampaign(
+            "Min Percentage",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
     // ============================================
     // Allocation Management Tests (7 tests)
     // ============================================
