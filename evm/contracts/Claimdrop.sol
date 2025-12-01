@@ -135,6 +135,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Track address position in _investors array for O(1) removal
     mapping(address => uint256) private _investorIndex;
 
+    /// @notice Total amount allocated across all investors
+    uint256 public totalAllocated;
+
     // ============ Events ============
 
     /// @notice Emitted when a campaign is created
@@ -203,6 +206,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error DistributionPercentageTooLow(uint256 index, uint256 bps, uint256 min);
     error DistributionOutsideCampaign(uint256 index);
     error InsufficientCampaignFunding(uint256 required, uint256 balance);
+    error AllocationExceedsTotalReward(uint256 totalAllocated, uint256 totalReward);
 
     // ============ Modifiers ============
 
@@ -348,6 +352,13 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             }
         }
 
+        // Validate total allocations don't exceed campaign reward
+        uint256 newTotalAllocated = totalAllocated + totalAmount;
+        if (newTotalAllocated > campaign.totalReward) {
+            revert AllocationExceedsTotalReward(newTotalAllocated, campaign.totalReward);
+        }
+        totalAllocated = newTotalAllocated;
+
         emit AllocationsAdded(addresses.length, totalAmount);
     }
 
@@ -404,6 +415,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         if (allocation == 0) revert NoAllocation(addr);
 
         delete allocations[addr];
+
+        // Decrement total allocated
+        totalAllocated -= allocation;
 
         // Remove from _investors array using swap-and-pop
         uint256 index = _investorIndex[addr];
