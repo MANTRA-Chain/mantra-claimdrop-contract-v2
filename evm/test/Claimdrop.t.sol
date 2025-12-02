@@ -2109,7 +2109,7 @@ contract ClaimdropTest is Test {
         claimdrop.claimOnBehalfOfBatch(users, amounts, "Batch with blacklisted");
     }
 
-    function test_RevertWhen_BatchClaimWithNothingToClaim() public {
+    function test_BatchClaimContinuesWhenUserHasNothingToClaim() public {
         // Create campaign with 100% lump sum
         delete distributions;
         distributions.push(
@@ -2145,7 +2145,10 @@ contract ClaimdropTest is Test {
         vm.prank(user1);
         claimdrop.claim(user1, 0);
 
-        // Now try to batch claim including user1 who has nothing left
+        uint256 user2BalanceBefore = token.balanceOf(user2);
+
+        // Now batch claim including user1 who has nothing left
+        // Batch should continue and process user2
         address[] memory users = new address[](2);
         users[0] = user1;
         users[1] = user2;
@@ -2153,8 +2156,149 @@ contract ClaimdropTest is Test {
         amounts[0] = 0;
         amounts[1] = 0;
 
-        vm.expectRevert(NOTHING_TO_CLAIM_SELECTOR);
-        claimdrop.claimOnBehalfOfBatch(users, amounts, "Batch with nothing to claim");
+        // Should succeed - skips user1's empty claim, processes user2
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Batch with already claimed user");
+
+        // Verify user2 received their tokens
+        assertEq(token.balanceOf(user2) - user2BalanceBefore, 1000 ether);
+    }
+
+    function test_BatchClaimContinuesWhenUserAlreadyClaimed() public {
+        // Create campaign with 30% lump sum, 70% vesting
+        createTestCampaign();
+        addTestAllocations(3, 1000 ether);
+
+        warpToStart();
+
+        // User1 claims their full lump sum (30%)
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+
+        uint256 user2BalanceBefore = token.balanceOf(user2);
+        uint256 user3BalanceBefore = token.balanceOf(user3);
+
+        // Now batch claim including user1 (who has nothing left in lump sum at t=0)
+        address[] memory users = new address[](3);
+        uint256[] memory amounts = new uint256[](3);
+        users[0] = user1; // Already partially claimed (lump sum)
+        users[1] = user2;
+        users[2] = user3;
+        amounts[0] = 0;
+        amounts[1] = 0;
+        amounts[2] = 0;
+
+        // Should succeed - skips user1's empty claim, processes user2 and user3
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Test batch");
+
+        // Verify user2 and user3 claimed their lump sum (30% of 1000 = 300)
+        (uint256 claimed2,,) = claimdrop.getRewards(user2);
+        (uint256 claimed3,,) = claimdrop.getRewards(user3);
+        assertEq(claimed2, 300 ether);
+        assertEq(claimed3, 300 ether);
+        assertEq(token.balanceOf(user2) - user2BalanceBefore, 300 ether);
+        assertEq(token.balanceOf(user3) - user3BalanceBefore, 300 ether);
+    }
+
+    function test_BatchClaimStillRevertsOnNoAllocation() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        // Only add allocation for user1, not user2
+        address[] memory addresses = new address[](1);
+        uint256[] memory allocs = new uint256[](1);
+        addresses[0] = user1;
+        allocs[0] = 1000 ether;
+        claimdrop.addAllocations(addresses, allocs);
+
+        vm.warp(startTime);
+
+        // Batch claim including user2 who has no allocation
+        address[] memory users = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        users[0] = user1;
+        users[1] = user2; // No allocation
+        amounts[0] = 0;
+        amounts[1] = 0;
+
+        // Should revert on user without allocation (security check)
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.NoAllocation.selector, user2));
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Batch with no allocation");
+    }
+
+    function test_BatchClaimCountsOnlySuccessful() public {
+        // Create campaign with 100% lump sum
+        delete distributions;
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LumpSum,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: 0,
+                cliffDuration: 0
+            })
+        );
+
+        // Fund before creating campaign
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        claimdrop.createCampaign(
+            "Test Campaign",
+            "Test Description",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        addTestAllocations(3, 1000 ether);
+
+        vm.warp(startTime);
+
+        // User1 fully claims their allocation first
+        vm.prank(user1);
+        claimdrop.claim(user1, 0);
+
+        address[] memory users = new address[](3);
+        uint256[] memory amounts = new uint256[](3);
+        users[0] = user1; // Will skip (nothing claimable)
+        users[1] = user2;
+        users[2] = user3;
+        amounts[0] = 0;
+        amounts[1] = 0;
+        amounts[2] = 0;
+
+        // Check event emission - count should be 2 (user2 and user3), not 3
+        vm.expectEmit(true, true, true, true);
+        emit BatchClaimed(2, "Test batch", owner);
+
+        claimdrop.claimOnBehalfOfBatch(users, amounts, "Test batch");
     }
 
     function test_ShouldEmitBatchClaimedEvent() public {

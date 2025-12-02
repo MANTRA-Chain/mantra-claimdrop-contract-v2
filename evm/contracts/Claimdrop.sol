@@ -453,6 +453,9 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param users Array of user addresses
     /// @param amounts Array of amounts to claim (0 for maximum available)
     /// @param memo Memo describing the reason for batch claim
+    /// @dev Skips users with nothing to claim while still reverting for security-critical errors
+    ///      (blacklisted, no allocation, insufficient balance). This prevents griefing where
+    ///      a single user can block the entire batch by pre-claiming.
     function claimOnBehalfOfBatch(
         address[] calldata users,
         uint256[] calldata amounts,
@@ -468,11 +471,14 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             revert InvalidBatchSize(users.length, MAX_CLAIM_BATCH_SIZE);
         }
 
+        uint256 successCount = 0;
         for (uint256 i = 0; i < users.length; i++) {
-            _claim(users[i], amounts[i], msg.sender);
+            if (_tryClaimForBatch(users[i], amounts[i], msg.sender)) {
+                successCount++;
+            }
         }
 
-        emit BatchClaimed(users.length, memo, msg.sender);
+        emit BatchClaimed(successCount, memo, msg.sender);
     }
 
     // ============ Administration ============
@@ -970,5 +976,78 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
 
         emit Claimed(receiver, claimAmount, sender);
+    }
+
+    /// @notice Internal claim logic for batch operations (skips instead of reverting for zero claimable)
+    /// @param receiver Address to receive tokens
+    /// @param amount Amount to claim (0 for maximum available)
+    /// @param sender Address initiating the claim
+    /// @return success Whether the claim was processed (false if nothing to claim)
+    /// @dev Security-critical reverts are preserved: campaign checks, blacklist, no allocation, insufficient balance
+    function _tryClaimForBatch(address receiver, uint256 amount, address sender) internal returns (bool success) {
+        if (!campaign.exists) revert CampaignNotFound();
+        if (block.timestamp < campaign.startTime) revert CampaignNotStarted();
+        // Note: CampaignAlreadyClosed check removed to allow claims for already-vested amounts
+        // Vesting calculations use closedAt as effective time when closed
+        if (blacklist[receiver]) revert Blacklisted(receiver);
+
+        // Check allowlist if configured
+        if (campaign.allowlistContract != address(0)) {
+            if (!Allowlist(campaign.allowlistContract).isAllowed(receiver)) {
+                revert NotOnAllowlist(receiver);
+            }
+        }
+
+        uint256 allocation = allocations[receiver];
+        if (allocation == 0) revert NoAllocation(receiver);
+
+        // Compute claimable amount
+        (uint256 claimable, uint256[] memory slotAmounts) = _computeClaimableAmount(receiver, allocation);
+
+        // Skip if nothing to claim (return false instead of reverting)
+        if (claimable == 0) {
+            return false;
+        }
+
+        // Determine claim amount - cap to claimable instead of reverting
+        uint256 claimAmount = amount == 0 ? claimable : amount;
+        if (claimAmount > claimable) {
+            claimAmount = claimable;
+        }
+
+        // Validate contract balance
+        uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
+        if (contractBalance < claimAmount) {
+            revert InsufficientBalance(claimAmount, contractBalance);
+        }
+
+        // Distribute to slots
+        uint256[] memory distribution = _distributeToSlots(claimAmount, slotAmounts);
+
+        // Update claims
+        for (uint256 i = 0; i < distribution.length; i++) {
+            if (distribution[i] > 0) {
+                Claim storage existingClaim = claims[receiver][i];
+                claims[receiver][i] = Claim({
+                    amountClaimed: (uint256(existingClaim.amountClaimed) + distribution[i]).toUint128(),
+                    timestamp: uint64(block.timestamp)
+                });
+            }
+        }
+
+        // Update campaign claimed amount
+        campaign.claimed += claimAmount;
+
+        // Validate invariant
+        uint256 totalClaimed = _getTotalClaimedForAddress(receiver);
+        if (totalClaimed > allocation) {
+            revert ExceedsAllocation(totalClaimed, allocation);
+        }
+
+        // Transfer tokens
+        IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
+
+        emit Claimed(receiver, claimAmount, sender);
+        return true;
     }
 }
