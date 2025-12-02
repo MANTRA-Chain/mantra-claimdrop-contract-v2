@@ -565,11 +565,13 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @return claimed Total claimed
     /// @return pending Total claimable now
     /// @return total Total allocation
+    /// @dev Pending amount uses closedAt as effective time when campaign is closed
     function getRewards(address addr) external view returns (uint256 claimed, uint256 pending, uint256 total) {
         total = allocations[addr];
         claimed = _getTotalClaimedForAddress(addr);
 
-        if (campaign.exists && block.timestamp >= campaign.startTime && campaign.closedAt == 0) {
+        // Allow pending calculation even after closure (vesting frozen at closedAt)
+        if (campaign.exists && block.timestamp >= campaign.startTime) {
             (pending,) = _computeClaimableAmount(addr, total);
         } else {
             pending = 0;
@@ -663,6 +665,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation User's total allocation
     /// @return claimable Total claimable amount
     /// @return slotAmounts Array of claimable per slot
+    /// @dev When campaign is closed, vesting calculations freeze at closedAt timestamp
     function _computeClaimableAmount(
         address user,
         uint256 allocation
@@ -674,14 +677,20 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         slotAmounts = new uint256[](campaign.distributions.length);
         claimable = 0;
 
+        // Determine effective timestamp (freeze at closedAt if closed)
+        uint256 effectiveTime = block.timestamp;
+        if (campaign.closedAt != 0 && campaign.closedAt < block.timestamp) {
+            effectiveTime = campaign.closedAt;
+        }
+
         for (uint256 i = 0; i < campaign.distributions.length; i++) {
             Distribution storage dist = campaign.distributions[i];
 
-            // Skip if distribution hasn't started
-            if (block.timestamp < dist.startTime) continue;
+            // Skip if distribution hasn't started (use effectiveTime)
+            if (effectiveTime < dist.startTime) continue;
 
-            // Skip if cliff hasn't passed
-            if (dist.cliffDuration > 0 && block.timestamp < dist.startTime + dist.cliffDuration) {
+            // Skip if cliff hasn't passed (use effectiveTime)
+            if (dist.cliffDuration > 0 && effectiveTime < dist.startTime + dist.cliffDuration) {
                 continue;
             }
 
@@ -689,7 +698,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             Claim storage prevClaim = claims[user][i];
 
             if (dist.kind == DistributionKind.LinearVesting) {
-                slotAmount = _calculateLinearVesting(dist, allocation, prevClaim);
+                slotAmount = _calculateLinearVestingWithTime(dist, allocation, prevClaim, effectiveTime);
             } else {
                 slotAmount = _calculateLumpSum(dist, allocation, prevClaim);
             }
@@ -716,7 +725,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         return (claimable, slotAmounts);
     }
 
-    /// @notice Calculate linear vesting amount
+    /// @notice Calculate linear vesting amount using current block.timestamp
     /// @param dist Distribution configuration
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
@@ -730,6 +739,26 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         view
         returns (uint256)
     {
+        return _calculateLinearVestingWithTime(dist, allocation, prevClaim, block.timestamp);
+    }
+
+    /// @notice Calculate linear vesting amount with specified timestamp
+    /// @param dist Distribution configuration
+    /// @param allocation Total allocation
+    /// @param prevClaim Previous claim record
+    /// @param currentTime The effective timestamp to use for calculation
+    /// @return Claimable amount for this distribution
+    /// @dev This allows vesting calculations to use closedAt as effective time when campaign is closed
+    function _calculateLinearVestingWithTime(
+        Distribution storage dist,
+        uint256 allocation,
+        Claim storage prevClaim,
+        uint256 currentTime
+    )
+        internal
+        view
+        returns (uint256)
+    {
         // Calculate allocation for this distribution
         uint256 distributionAllocation = (allocation * dist.percentageBps) / BASIS_POINTS_TOTAL;
 
@@ -738,7 +767,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         if (duration == 0) return 0;
 
         // Calculate elapsed time (capped at duration)
-        uint256 elapsed = block.timestamp - dist.startTime;
+        uint256 elapsed = currentTime - dist.startTime;
         if (elapsed > duration) elapsed = duration;
 
         // Calculate vested amount
@@ -777,17 +806,24 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
     /// @notice Check if all distributions have ended
     /// @return True if all distributions ended
+    /// @dev When campaign is closed, uses closedAt as effective time
     function _distributionTypesEnded() internal view returns (bool) {
         if (!campaign.exists) return false;
+
+        // Determine effective timestamp (freeze at closedAt if closed)
+        uint256 effectiveTime = block.timestamp;
+        if (campaign.closedAt != 0 && campaign.closedAt < block.timestamp) {
+            effectiveTime = campaign.closedAt;
+        }
 
         for (uint256 i = 0; i < campaign.distributions.length; i++) {
             Distribution storage dist = campaign.distributions[i];
 
             if (dist.kind == DistributionKind.LinearVesting) {
-                if (block.timestamp < dist.endTime) return false;
+                if (effectiveTime < dist.endTime) return false;
             } else {
                 // LumpSum
-                if (block.timestamp < dist.startTime) return false;
+                if (effectiveTime < dist.startTime) return false;
             }
         }
 
@@ -868,10 +904,13 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param receiver Address to receive tokens
     /// @param amount Amount to claim (0 for maximum available)
     /// @param sender Address initiating the claim
+    /// @dev Claims are allowed after campaign closure for already-vested amounts.
+    ///      Vesting calculations freeze at closedAt timestamp.
     function _claim(address receiver, uint256 amount, address sender) internal {
         if (!campaign.exists) revert CampaignNotFound();
         if (block.timestamp < campaign.startTime) revert CampaignNotStarted();
-        if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
+        // Note: CampaignAlreadyClosed check removed to allow claims for already-vested amounts
+        // Vesting calculations use closedAt as effective time when closed
         if (blacklist[receiver]) revert Blacklisted(receiver);
 
         // Check allowlist if configured
