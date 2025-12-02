@@ -505,6 +505,9 @@ contract ClaimdropTest is Test {
     function test_ShouldCloseCampaignAndReturnUnclaimedTokens() public {
         createTestCampaign();
 
+        // Warp to end time to allow closure
+        warpToEnd();
+
         uint256 balanceBefore = token.balanceOf(owner);
         claimdrop.closeCampaign();
         uint256 balanceAfter = token.balanceOf(owner);
@@ -516,6 +519,7 @@ contract ClaimdropTest is Test {
 
     function test_RevertWhen_ClosingAlreadyClosedCampaign() public {
         createTestCampaign();
+        warpToEnd();
         claimdrop.closeCampaign();
 
         vm.expectRevert(CAMPAIGN_CLOSED_SELECTOR);
@@ -524,10 +528,72 @@ contract ClaimdropTest is Test {
 
     function test_RevertWhen_NonOwnerClosingCampaign() public {
         createTestCampaign();
+        warpToEnd();
 
         vm.prank(admin);
         vm.expectRevert(); // Ownable2Step revert
         claimdrop.closeCampaign();
+    }
+
+    function test_RevertWhen_ClosingActiveCampaign() public {
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // Warp to middle of campaign (still active)
+        warpPastStart(30 days);
+
+        vm.expectRevert(abi.encodeWithSignature("CampaignStillActive()"));
+        claimdrop.closeCampaign();
+    }
+
+    function test_ShouldAllowClosingEndedCampaign() public {
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // Warp past end time
+        warpToEnd();
+        vm.warp(block.timestamp + 1); // Just past endTime
+
+        // Should succeed
+        claimdrop.closeCampaign();
+
+        (,,,,,,,, uint64 closedAt,,) = claimdrop.campaign();
+        assertTrue(closedAt > 0);
+    }
+
+    function test_ShouldAllowClosingAtExactEndTime() public {
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // Warp to exact end time
+        warpToEnd();
+
+        // Should succeed at exact boundary
+        claimdrop.closeCampaign();
+
+        (,,,,,,,, uint64 closedAt,,) = claimdrop.campaign();
+        assertTrue(closedAt > 0);
+    }
+
+    function test_CloseRefundsRemainingTokens() public {
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // User claims some tokens at start
+        warpToStart();
+        vm.prank(user1);
+        claimdrop.claim(user1, 0); // Claim available lump sum (300 ether)
+
+        // Warp to end
+        warpToEnd();
+
+        uint256 ownerBalanceBefore = token.balanceOf(owner);
+        uint256 contractBalanceBefore = token.balanceOf(address(claimdrop));
+
+        claimdrop.closeCampaign();
+
+        uint256 ownerBalanceAfter = token.balanceOf(owner);
+        assertEq(ownerBalanceAfter - ownerBalanceBefore, contractBalanceBefore);
     }
 
     function test_RevertWhen_TooManyDistributions() public {
@@ -2702,41 +2768,40 @@ contract ClaimdropTest is Test {
     // ============================================
 
     /**
-     * @notice Test that users can claim already-vested tokens after campaign closure
+     * @notice Test that users can claim fully-vested tokens after campaign closure
      */
     function test_ShouldAllowClaimAfterCampaignClosure() public {
         createTestCampaign(); // 30% lump sum, 70% vesting
         addTestAllocations(1, 1000 ether);
 
-        // Warp to 50% vesting (30 days into the campaign)
-        uint256 halfDuration = (endTime - startTime) / 2;
-        warpPastStart(halfDuration);
+        // Warp to end time (campaign must end before closure)
+        warpToEnd();
 
-        // Get pending before close
+        // Get pending before close (should be full allocation since vesting is complete)
         (, uint256 pendingBefore,) = claimdrop.getRewards(user1);
-        assertTrue(pendingBefore > 0, "Should have pending amount before close");
+        assertEq(pendingBefore, 1000 ether, "Should have full allocation available");
 
         // Close campaign (refunds all remaining tokens to owner)
         claimdrop.closeCampaign();
 
-        // Get pending after close - should still show vested amount frozen at closedAt
+        // Get pending after close - should still show full amount
         (, uint256 pendingAfterClose,) = claimdrop.getRewards(user1);
-        assertEq(pendingAfterClose, pendingBefore, "Pending should be frozen at close time");
+        assertEq(pendingAfterClose, pendingBefore, "Pending should match pre-close amount");
 
         // Fund contract to cover pending claims (since closeCampaign refunded everything)
         token.transfer(address(claimdrop), pendingAfterClose);
 
-        // User should still be able to claim vested amount
+        // User should still be able to claim full amount
         uint256 balanceBefore = token.balanceOf(user1);
         vm.prank(user1);
         claimdrop.claim(user1, 0);
         uint256 balanceAfter = token.balanceOf(user1);
 
-        assertEq(balanceAfter - balanceBefore, pendingBefore, "Should claim the vested amount");
+        assertEq(balanceAfter - balanceBefore, pendingBefore, "Should claim the full amount");
     }
 
     /**
-     * @notice Test that vesting calculations freeze at closure time
+     * @notice Test that vesting calculations freeze at closure time (at endTime)
      */
     function test_VestingFreezeAtClosureTime() public {
         // Create campaign with 100% linear vesting
@@ -2768,23 +2833,22 @@ contract ClaimdropTest is Test {
 
         addTestAllocations(1, 1000 ether);
 
-        // Warp to 50% vesting
-        uint256 halfDuration = (endTime - startTime) / 2;
-        warpPastStart(halfDuration);
+        // Warp to end time (required for closure)
+        warpToEnd();
 
-        (, uint256 pendingAtClose,) = claimdrop.getRewards(user1);
-        // At 50%, should be ~500 ether vested
-        assertApproxEqAbs(pendingAtClose, 500 ether, 1 ether, "Should have ~50% vested");
+        (, uint256 pendingAtEnd,) = claimdrop.getRewards(user1);
+        // At endTime, should have 100% vested
+        assertEq(pendingAtEnd, 1000 ether, "Should have 100% vested at endTime");
 
         // Close campaign
         claimdrop.closeCampaign();
 
-        // Warp to 100% vesting time
-        warpToEnd();
+        // Warp past end time
+        vm.warp(block.timestamp + 30 days);
 
-        // Pending should still be frozen at close time (50%)
-        (, uint256 pendingAfterEnd,) = claimdrop.getRewards(user1);
-        assertEq(pendingAfterEnd, pendingAtClose, "Pending should be frozen at close time, not increase");
+        // Pending should still be at 100% (frozen at closedAt)
+        (, uint256 pendingAfterClose,) = claimdrop.getRewards(user1);
+        assertEq(pendingAfterClose, pendingAtEnd, "Pending should remain at 100% after close");
     }
 
     /**
@@ -2794,25 +2858,25 @@ contract ClaimdropTest is Test {
         createTestCampaign(); // 30% lump sum, 70% vesting
         addTestAllocations(1, 1000 ether);
 
-        // Warp to start - lump sum is immediately available
-        warpToStart();
-
-        (, uint256 pendingAtStart,) = claimdrop.getRewards(user1);
-        assertEq(pendingAtStart, 300 ether, "Should have 30% lump sum available at start");
-
-        // Close campaign immediately at start
-        claimdrop.closeCampaign();
-
-        // getRewards should still return the lump sum pending
-        (, uint256 pendingAfterClose,) = claimdrop.getRewards(user1);
-        assertEq(pendingAfterClose, 300 ether, "Should still show lump sum pending after close");
-
-        // Warp to end of campaign
+        // Warp to end time (required for closure)
         warpToEnd();
 
-        // Pending should NOT increase since campaign was closed at start
         (, uint256 pendingAtEnd,) = claimdrop.getRewards(user1);
-        assertEq(pendingAtEnd, 300 ether, "Pending should remain frozen at closure amount");
+        assertEq(pendingAtEnd, 1000 ether, "Should have full allocation at end");
+
+        // Close campaign
+        claimdrop.closeCampaign();
+
+        // getRewards should still return the full pending
+        (, uint256 pendingAfterClose,) = claimdrop.getRewards(user1);
+        assertEq(pendingAfterClose, 1000 ether, "Should still show full pending after close");
+
+        // Warp even further past end time
+        vm.warp(block.timestamp + 30 days);
+
+        // Pending should remain at full amount
+        (, uint256 pendingLater,) = claimdrop.getRewards(user1);
+        assertEq(pendingLater, 1000 ether, "Pending should remain frozen at closure amount");
     }
 
     /**
@@ -2822,8 +2886,8 @@ contract ClaimdropTest is Test {
         createTestCampaign();
         addTestAllocations(1, 1000 ether);
 
-        // Warp past start
-        warpPastStart(30 days);
+        // Warp to end time (required for closure)
+        warpToEnd();
 
         (, uint256 pendingBefore,) = claimdrop.getRewards(user1);
 
@@ -2846,11 +2910,11 @@ contract ClaimdropTest is Test {
         createTestCampaign(); // 30% lump sum, 70% vesting
         addTestAllocations(1, 1000 ether);
 
-        // Warp to middle of campaign
-        uint256 halfDuration = (endTime - startTime) / 2;
-        warpPastStart(halfDuration);
+        // Warp to end time (required for closure)
+        warpToEnd();
 
         (, uint256 totalPending,) = claimdrop.getRewards(user1);
+        assertEq(totalPending, 1000 ether, "Should have full allocation pending");
 
         // Close campaign
         claimdrop.closeCampaign();
