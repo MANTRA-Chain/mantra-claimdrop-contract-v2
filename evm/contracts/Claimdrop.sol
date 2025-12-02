@@ -207,6 +207,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error DistributionOutsideCampaign(uint256 index);
     error InsufficientCampaignFunding(uint256 required, uint256 balance);
     error AllocationExceedsTotalReward(uint256 totalAllocated, uint256 totalReward);
+    error CampaignStillActive();
 
     // ============ Modifiers ============
 
@@ -293,9 +294,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     }
 
     /// @notice Close the campaign and return unclaimed tokens to owner
+    /// @dev Requires campaign to have reached endTime to prevent early closure
     function closeCampaign() external onlyOwner nonReentrant {
         if (!campaign.exists) revert CampaignNotFound();
         if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
+        if (block.timestamp < campaign.endTime) revert CampaignStillActive();
 
         // Query current balance
         uint256 refund = IERC20(campaign.rewardToken).balanceOf(address(this));
