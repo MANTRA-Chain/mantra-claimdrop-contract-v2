@@ -208,6 +208,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error InsufficientCampaignFunding(uint256 required, uint256 balance);
     error AllocationExceedsTotalReward(uint256 totalAllocated, uint256 totalReward);
     error CampaignStillActive();
+    error CliffExceedsVestingPeriod(uint256 index);
 
     // ============ Modifiers ============
 
@@ -651,6 +652,11 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
                 // Validate vesting period is positive
                 if (distributions[i].endTime <= distributions[i].startTime) {
                     revert InvalidVestingPeriod(i);
+                }
+                // Validate cliff is strictly less than vesting period
+                uint256 vestingPeriod = distributions[i].endTime - distributions[i].startTime;
+                if (distributions[i].cliffDuration >= vestingPeriod) {
+                    revert CliffExceedsVestingPeriod(i);
                 }
                 // Validate vesting is within campaign bounds
                 if (distributions[i].startTime < startTime || distributions[i].endTime > endTime) {
