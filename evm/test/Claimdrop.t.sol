@@ -874,6 +874,174 @@ contract ClaimdropTest is Test {
     }
 
     // ============================================
+    // Cliff Duration Validation Tests (5 tests)
+    // ============================================
+
+    function test_RevertWhen_CliffExceedsVestingPeriod() public {
+        delete distributions;
+
+        uint64 vestingDuration = uint64(endTime - startTime); // 1 year
+
+        // Cliff longer than vesting period
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: uint64(endTime),
+                cliffDuration: vestingDuration + 1 // Exceeds vesting period
+             })
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.CliffExceedsVestingPeriod.selector, 0));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_RevertWhen_CliffEqualsVestingPeriod() public {
+        delete distributions;
+
+        uint64 vestingDuration = uint64(endTime - startTime);
+
+        // Cliff exactly equals vesting period
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: uint64(endTime),
+                cliffDuration: vestingDuration // Equals vesting period
+             })
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        vm.expectRevert(abi.encodeWithSelector(Claimdrop.CliffExceedsVestingPeriod.selector, 0));
+        claimdrop.createCampaign(
+            "Test",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+    }
+
+    function test_ShouldAllowCliffJustUnderVestingPeriod() public {
+        delete distributions;
+
+        uint64 vestingDuration = uint64(endTime - startTime);
+
+        // Cliff is 1 second less than vesting period (valid but extreme)
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: uint64(endTime),
+                cliffDuration: vestingDuration - 1
+            })
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        // Should succeed
+        claimdrop.createCampaign(
+            "Edge Case Cliff",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
+    function test_ShouldAllowZeroCliff() public {
+        delete distributions;
+
+        // No cliff (cliffDuration = 0)
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: uint64(endTime),
+                cliffDuration: 0 // No cliff
+             })
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        // Should succeed
+        claimdrop.createCampaign(
+            "No Cliff",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
+    function test_ShouldAllowReasonableCliff() public {
+        delete distributions;
+
+        // 30-day cliff on 1-year vesting (reasonable configuration)
+        distributions.push(
+            Claimdrop.Distribution({
+                kind: Claimdrop.DistributionKind.LinearVesting,
+                percentageBps: 10_000,
+                startTime: uint64(startTime),
+                endTime: uint64(endTime),
+                cliffDuration: 30 days
+            })
+        );
+
+        token.transfer(address(claimdrop), CAMPAIGN_REWARD);
+
+        claimdrop.createCampaign(
+            "Normal Cliff",
+            "Test",
+            "airdrop",
+            address(token),
+            CAMPAIGN_REWARD,
+            distributions,
+            uint64(startTime),
+            uint64(endTime),
+            address(0)
+        );
+
+        (,,,,,,,,, bool exists,) = claimdrop.campaign();
+        assertTrue(exists);
+    }
+
+    // ============================================
     // Allocation Management Tests (7 tests)
     // ============================================
 
