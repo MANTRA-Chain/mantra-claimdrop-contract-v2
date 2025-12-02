@@ -84,9 +84,10 @@ main() {
 
     # Execute setup phases
     mint_test_tokens
-    approve_token_transfer
-    create_campaign_with_safe_timing
+    # Transfer reward tokens BEFORE creating campaign
+    # (createCampaign validates the contract has sufficient balance)
     transfer_reward_tokens
+    create_campaign_with_safe_timing
     add_test_allocations
 
     # Print summary
@@ -208,7 +209,7 @@ create_campaign_with_safe_timing() {
         --gas-price "$GAS_PRICE" \
         --json \
         "$CLAIMDROP" \
-        "createCampaign(string,string,string,address,uint256,(uint8,uint16,uint64,uint64,uint64)[],uint64,uint64)" \
+        "createCampaign(string,string,string,address,uint256,(uint8,uint16,uint64,uint64,uint64)[],uint64,uint64,address)" \
         "E2E Test Campaign" \
         "Pure cast E2E testing - no forge scripts" \
         "e2e-test" \
@@ -216,7 +217,8 @@ create_campaign_with_safe_timing() {
         "100000000000000000000" \
         "$distributions" \
         "$start_time" \
-        "$end_time") || {
+        "$end_time" \
+        "0x0000000000000000000000000000000000000000") || {
         log_error "Failed to create campaign"
         exit 1
     }

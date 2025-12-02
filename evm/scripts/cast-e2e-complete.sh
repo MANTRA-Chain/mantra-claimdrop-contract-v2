@@ -226,14 +226,12 @@ setup_campaign() {
     # Mint tokens
     mint_tokens
 
-    # Approve tokens
-    approve_tokens
+    # Transfer reward tokens to contract BEFORE creating campaign
+    # (createCampaign validates the contract has sufficient balance)
+    transfer_reward_tokens
 
     # Create campaign with safe timing
     create_campaign
-
-    # Transfer reward tokens
-    transfer_reward_tokens
 
     echo ""
 }
@@ -327,9 +325,9 @@ create_campaign() {
         $LEGACY_FLAG \
         --gas-price "$GAS_PRICE" \
         --gas-limit "$GAS_LIMIT" \
-            --json \
+        --json \
         "$CLAIMDROP" \
-        "createCampaign(string,string,string,address,uint256,(uint8,uint16,uint64,uint64,uint64)[],uint64,uint64)" \
+        "createCampaign(string,string,string,address,uint256,(uint8,uint16,uint64,uint64,uint64)[],uint64,uint64,address)" \
         "E2E Complete Test Campaign" \
         "Fully automated E2E test with funded addresses" \
         "e2e-complete" \
@@ -337,7 +335,8 @@ create_campaign() {
         "100000000000000000000" \
         "$distributions" \
         "$START_TIME" \
-        "$END_TIME") || {
+        "$END_TIME" \
+        "0x0000000000000000000000000000000000000000") || {
         log_error "Failed to create campaign"
         exit 1
     }
