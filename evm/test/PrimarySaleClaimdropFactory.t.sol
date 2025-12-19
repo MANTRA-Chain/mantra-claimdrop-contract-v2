@@ -32,7 +32,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         implementation = new PrimarySaleClaimdropFactory();
 
         // Deploy ProxyAdmin (no constructor args in newer versions)
-        proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin(proxyAdminOwner);
 
         // Prepare initialization data with metadata
         bytes memory initData = abi.encodeWithSelector(
@@ -172,7 +172,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
         // Upgrade the proxy to the new implementation
-        proxyAdmin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation));
+        proxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation), "");
 
         // Verify state is preserved
         assertEq(factory.getDeployedClaimdropsCount(), 1);
@@ -190,7 +190,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // User cannot upgrade
         vm.prank(user);
         vm.expectRevert();
-        proxyAdmin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation));
+        proxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation), "");
     }
 
     function testProxyAdminOwnership() public view {
