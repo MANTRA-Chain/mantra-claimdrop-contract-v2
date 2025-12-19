@@ -3247,4 +3247,48 @@ contract ClaimdropTest is Test {
         (, uint256 remainingPending,) = claimdrop.getRewards(user1);
         assertApproxEqAbs(remainingPending, totalPending - partialFunding, 1, "Should have remaining pending");
     }
+
+    // ============================================
+    // Blacklist Logic Tests (2 tests)
+    // ============================================
+
+    function test_ShouldReturnZeroPendingForBlacklistedUserBeforeCampaignStart() public {
+        createTestCampaign();
+        addTestAllocations(1, 1000 ether);
+
+        // Blacklist user1 before campaign starts
+        claimdrop.blacklistAddress(user1, true);
+
+        // Check rewards before campaign starts. `getRewards` should enter the `else if (isBlacklisted(addr))` branch.
+        (uint256 claimed, uint256 pending, uint256 total) = claimdrop.getRewards(user1);
+
+        assertEq(claimed, 0, "Claimed should be 0");
+        assertEq(pending, 0, "Pending should be 0 for blacklisted user before start");
+        assertEq(total, 1000 ether, "Total should be the allocation amount");
+    }
+
+    function test_ShouldReturnVestedAmountForBlacklistedUserAfterCampaignStart() public {
+        createTestCampaign(); // 30% lump sum, 70% vesting
+        addTestAllocations(1, 1000 ether); // User1 gets 300 lump, 700 vesting
+
+        // Blacklist user1 before campaign starts
+        claimdrop.blacklistAddress(user1, true);
+
+        // Warp to start. `getRewards` should now enter the first `if` branch.
+        warpToStart();
+        (, uint256 pending,) = claimdrop.getRewards(user1);
+        assertEq(pending, 300 ether, "Pending should show vested amount for blacklisted user after start");
+
+        // At 50% through vesting period
+        uint256 halfTime = startTime + (endTime - startTime) / 2;
+        vm.warp(halfTime);
+        (, uint256 pending50,) = claimdrop.getRewards(user1);
+        // 300 from lump sum + 350 from vesting (50% of 700)
+        assertApproxEqAbs(pending50, 650 ether, 1 ether, "Pending should include vested amount for blacklisted user");
+
+        // And check that claiming is reverted, because user is blacklisted.
+        vm.prank(user1);
+        vm.expectRevert(abi.encodeWithSelector(BLACKLISTED_SELECTOR, user1));
+        claimdrop.claim(user1, 0);
+    }
 }
