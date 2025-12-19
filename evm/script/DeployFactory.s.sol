@@ -25,7 +25,7 @@ contract DeployFactory is Script {
 
         // 1. Deploy the ProxyAdmin contract
         console.log("\n1. Deploying ProxyAdmin contract...");
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ProxyAdmin proxyAdmin = new ProxyAdmin(factoryAdmin);
         console.log("ProxyAdmin deployed to:", address(proxyAdmin));
 
         // 2. Deploy the implementation contract
