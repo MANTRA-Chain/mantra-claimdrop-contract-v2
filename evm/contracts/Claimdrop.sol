@@ -200,6 +200,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error ZeroAddress();
     error Unauthorized();
     error LumpSumStartAfterCampaignEnd(uint256 distributionIndex);
+    error LumpSumDistributionsShouldNotHaveCliff();
     error InvalidVestingPeriod(uint256 distributionIndex);
     error SameAddress();
     error TooManyDistributions(uint256 count, uint256 max);
@@ -663,6 +664,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
                 // LumpSum: startTime must be within campaign window
                 if (distributions[i].startTime < startTime || distributions[i].startTime > endTime) {
                     revert DistributionOutsideCampaign(i);
+                }
+                // LumpSum should not have a cliff
+                if (distributions[i].cliffDuration != 0) {
+                    revert LumpSumDistributionsShouldNotHaveCliff();
                 }
             }
         }
