@@ -578,7 +578,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         // Allow pending calculation even after closure (vesting frozen at closedAt)
         if (campaign.exists && block.timestamp >= campaign.startTime) {
             (pending,) = _computeClaimableAmount(addr, total);
-        } else {
+        } else if (isBlacklisted(addr)) {
+            pending = 0;
+        }
+        else {
             pending = 0;
         }
     }
@@ -586,7 +589,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Check if address is blacklisted
     /// @param addr Address to check
     /// @return Blacklist status
-    function isBlacklisted(address addr) external view returns (bool) {
+    function isBlacklisted(address addr) public view returns (bool) {
         return blacklist[addr];
     }
 
