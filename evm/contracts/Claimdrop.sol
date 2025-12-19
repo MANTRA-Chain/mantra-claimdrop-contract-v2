@@ -72,7 +72,6 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     enum DistributionKind {
         LinearVesting, // Tokens vest linearly over time
         LumpSum // Tokens released at specific time
-
     }
 
     // ============ Structs ============
@@ -170,7 +169,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     event AuthorizedWalletUpdated(address indexed wallet, bool indexed authorized);
 
     /// @notice Emitted when tokens are swept
-    event Swept(address indexed token, address indexed recipient, uint256 amount);
+    event Swept(address indexed token, address indexed recipient, uint256 amount, bool indexed native);
 
     // ============ Errors ============
 
@@ -196,6 +195,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error ExceedsAllocation(uint256 claimed, uint256 allocation);
     error InsufficientBalance(uint256 required, uint256 available);
     error CannotSweepRewardToken();
+    error CannotSweepNative();
     error ZeroAmount();
     error ZeroAddress();
     error Unauthorized();
@@ -207,6 +207,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     error DistributionPercentageTooLow(uint256 index, uint256 bps, uint256 min);
     error DistributionOutsideCampaign(uint256 index);
     error InsufficientCampaignFunding(uint256 required, uint256 balance);
+    error InvalidNativeCampaignFunding(uint256 expected, uint256 actual);
     error AllocationExceedsTotalReward(uint256 totalAllocated, uint256 totalReward);
     error CampaignStillActive();
     error CliffExceedsVestingPeriod(uint256 index);
@@ -233,7 +234,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param name Campaign name
     /// @param description Campaign description
     /// @param campaignType Campaign type identifier
-    /// @param rewardToken ERC20 token address for rewards
+    /// @param rewardToken ERC20 token address for rewards (address(0) for native)
     /// @param totalReward Total amount of tokens to distribute
     /// @param distributions Array of distribution configurations
     /// @param startTime Campaign start timestamp
@@ -252,23 +253,31 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint64 startTime,
         uint64 endTime,
         address allowlistContract
-    )
-        external
-        onlyAuthorized
-        whenNotPaused
-    {
+    ) external payable onlyAuthorized whenNotPaused {
         if (campaign.exists) revert CampaignAlreadyExists();
-        if (rewardToken == address(0)) revert ZeroAddress();
+
         if (totalReward == 0) revert ZeroAmount();
         if (distributions.length == 0) revert InvalidDistributions();
 
         // Validate campaign parameters
         _validateCampaignParams(distributions, startTime, endTime);
 
-        // Validate sufficient funding
-        uint256 balance = IERC20(rewardToken).balanceOf(address(this));
-        if (balance < totalReward) {
-            revert InsufficientCampaignFunding(totalReward, balance);
+        if (isNative(rewardToken)) {
+            // Native token campaign
+            if (msg.value != totalReward) {
+                revert InvalidNativeCampaignFunding(totalReward, msg.value);
+            }
+        } else {
+            // ERC20 campaign
+            if (msg.value != 0) {
+                revert InvalidNativeCampaignFunding(0, msg.value);
+            }
+
+            uint256 balance = IERC20(rewardToken).balanceOf(address(this));
+
+            if (balance < totalReward) {
+                revert InsufficientCampaignFunding(totalReward, balance);
+            }
         }
 
         // Create campaign
@@ -297,12 +306,31 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         if (campaign.closedAt != 0) revert CampaignAlreadyClosed();
         if (block.timestamp < campaign.endTime) revert CampaignStillActive();
 
-        // Query current balance
-        uint256 refund = IERC20(campaign.rewardToken).balanceOf(address(this));
+        uint256 remainingToClaim = totalAllocated - campaign.claimed;
+        uint256 refund = 0;
 
-        // Transfer unclaimed tokens to owner
-        if (refund > 0) {
-            IERC20(campaign.rewardToken).safeTransfer(owner(), refund);
+        if (isNative(campaign.rewardToken)) {
+            uint256 balance = address(this).balance;
+
+            if (balance > remainingToClaim) {
+                refund = balance - remainingToClaim;
+            }
+
+            if (refund > 0) {
+                (bool success,) = owner().call{value: refund}("");
+
+                require(success, "Refund failed");
+            }
+        } else {
+            uint256 balance = IERC20(campaign.rewardToken).balanceOf(address(this));
+
+            if (balance > remainingToClaim) {
+                refund = balance - remainingToClaim;
+            }
+
+            if (refund > 0) {
+                IERC20(campaign.rewardToken).safeTransfer(owner(), refund);
+            }
         }
 
         // Mark campaign as closed
@@ -316,10 +344,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @notice Add allocations in batch
     /// @param addresses Array of addresses
     /// @param amounts Array of allocation amounts
-    function addAllocations(
-        address[] calldata addresses,
-        uint256[] calldata amounts
-    )
+    function addAllocations(address[] calldata addresses, uint256[] calldata amounts)
         external
         onlyAuthorized
         whenNotPaused
@@ -452,11 +477,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @dev Skips users with nothing to claim while still reverting for security-critical errors
     ///      (blacklisted, no allocation, insufficient balance). This prevents griefing where
     ///      a single user can block the entire batch by pre-claiming.
-    function claimOnBehalfOfBatch(
-        address[] calldata users,
-        uint256[] calldata amounts,
-        string calldata memo
-    )
+    function claimOnBehalfOfBatch(address[] calldata users, uint256[] calldata amounts, string calldata memo)
         external
         onlyAuthorized
         nonReentrant
@@ -508,12 +529,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         }
     }
 
-    /// @notice Sweep non-reward tokens from contract
+    /// @notice Sweep non-reward ERC20 tokens from contract
     /// @param token Token address to sweep
     /// @param amount Amount to sweep
     function sweep(address token, uint256 amount) external onlyOwner nonReentrant {
-        // Prevent sweeping reward token if campaign exists and is not closed
-        if (campaign.exists && campaign.closedAt == 0 && token == campaign.rewardToken) {
+        // Prevent sweeping reward token if campaign exists and is not native
+        if (campaign.exists && !isNative(campaign.rewardToken) && token == campaign.rewardToken) {
             revert CannotSweepRewardToken();
         }
 
@@ -524,7 +545,27 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
         IERC20(token).safeTransfer(owner(), amount);
 
-        emit Swept(token, owner(), amount);
+        emit Swept(token, owner(), amount, false);
+    }
+
+    /// @notice Sweep native tokens from the contract
+    /// @dev This function allows the owner to withdraw the entire native token balance
+    ///      from the contract, but only if there is no active native campaign. This
+    ///      prevents accidental sweeping of funds belonging to a campaign.
+    function sweepNative() external onlyOwner nonReentrant {
+        // Prevent sweeping native tokens if a native campaign is active or was active
+
+        if (campaign.exists && isNative(campaign.rewardToken)) {
+            revert CannotSweepNative();
+        }
+
+        uint256 amount = address(this).balance;
+        if (amount == 0) revert ZeroAmount();
+
+        (bool success,) = owner().call{value: amount}("");
+        require(success, "Native token sweep failed");
+
+        emit Swept(address(0), owner(), amount, true);
     }
 
     /// @notice Pause contract (emergency)
@@ -580,8 +621,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             (pending,) = _computeClaimableAmount(addr, total);
         } else if (isBlacklisted(addr)) {
             pending = 0;
-        }
-        else {
+        } else {
             pending = 0;
         }
     }
@@ -608,15 +648,18 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
     // ============ Internal Functions ============
 
+    /// @notice Check if a token address is the native token
+    /// @param token The address of the token
+    /// @return True if the token is the native token, false otherwise
+    function isNative(address token) internal pure returns (bool) {
+        return token == address(0);
+    }
+
     /// @notice Validate campaign parameters
     /// @param distributions Array of distributions
     /// @param startTime Campaign start time
     /// @param endTime Campaign end time
-    function _validateCampaignParams(
-        Distribution[] calldata distributions,
-        uint64 startTime,
-        uint64 endTime
-    )
+    function _validateCampaignParams(Distribution[] calldata distributions, uint64 startTime, uint64 endTime)
         internal
         view
     {
@@ -683,10 +726,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @return claimable Total claimable amount
     /// @return slotAmounts Array of claimable per slot
     /// @dev When campaign is closed, vesting calculations freeze at closedAt timestamp
-    function _computeClaimableAmount(
-        address user,
-        uint256 allocation
-    )
+    function _computeClaimableAmount(address user, uint256 allocation)
         internal
         view
         returns (uint256 claimable, uint256[] memory slotAmounts)
@@ -747,11 +787,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
     /// @return Claimable amount for this distribution
-    function _calculateLinearVesting(
-        Distribution storage dist,
-        uint256 allocation,
-        Claim storage prevClaim
-    )
+    function _calculateLinearVesting(Distribution storage dist, uint256 allocation, Claim storage prevClaim)
         internal
         view
         returns (uint256)
@@ -771,11 +807,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         uint256 allocation,
         Claim storage prevClaim,
         uint256 currentTime
-    )
-        internal
-        view
-        returns (uint256)
-    {
+    ) internal view returns (uint256) {
         // Calculate allocation for this distribution
         uint256 distributionAllocation = (allocation * dist.percentageBps) / BASIS_POINTS_TOTAL;
 
@@ -802,11 +834,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param allocation Total allocation
     /// @param prevClaim Previous claim record
     /// @return Claimable amount for this distribution
-    function _calculateLumpSum(
-        Distribution storage dist,
-        uint256 allocation,
-        Claim storage prevClaim
-    )
+    function _calculateLumpSum(Distribution storage dist, uint256 allocation, Claim storage prevClaim)
         internal
         view
         returns (uint256)
@@ -873,10 +901,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
     /// @param amount Amount to distribute
     /// @param slotAmounts Available amounts per slot
     /// @return distribution Distribution per slot
-    function _distributeToSlots(
-        uint256 amount,
-        uint256[] memory slotAmounts
-    )
+    function _distributeToSlots(uint256 amount, uint256[] memory slotAmounts)
         internal
         view
         returns (uint256[] memory distribution)
@@ -951,10 +976,16 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             revert ExceedsClaimable(claimAmount, claimable);
         }
 
-        // Validate contract balance
-        uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
-        if (contractBalance < claimAmount) {
-            revert InsufficientBalance(claimAmount, contractBalance);
+        if (isNative(campaign.rewardToken)) {
+            uint256 contractBalance = address(this).balance;
+            if (contractBalance < claimAmount) {
+                revert InsufficientBalance(claimAmount, contractBalance);
+            }
+        } else {
+            uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
+            if (contractBalance < claimAmount) {
+                revert InsufficientBalance(claimAmount, contractBalance);
+            }
         }
 
         // Distribute to slots
@@ -980,8 +1011,12 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             revert ExceedsAllocation(totalClaimed, allocation);
         }
 
-        // Transfer tokens
-        IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
+        if (isNative(campaign.rewardToken)) {
+            (bool success,) = receiver.call{value: claimAmount}("");
+            require(success, "Native token transfer failed");
+        } else {
+            IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
+        }
 
         emit Claimed(receiver, claimAmount, sender);
     }
@@ -1023,10 +1058,18 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             claimAmount = claimable;
         }
 
-        // Validate contract balance
-        uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
-        if (contractBalance < claimAmount) {
-            revert InsufficientBalance(claimAmount, contractBalance);
+        if (isNative(campaign.rewardToken)) {
+            uint256 contractBalance = address(this).balance;
+
+            if (contractBalance < claimAmount) {
+                revert InsufficientBalance(claimAmount, contractBalance);
+            }
+        } else {
+            uint256 contractBalance = IERC20(campaign.rewardToken).balanceOf(address(this));
+
+            if (contractBalance < claimAmount) {
+                revert InsufficientBalance(claimAmount, contractBalance);
+            }
         }
 
         // Distribute to slots
@@ -1052,8 +1095,13 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             revert ExceedsAllocation(totalClaimed, allocation);
         }
 
-        // Transfer tokens
-        IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
+        if (isNative(campaign.rewardToken)) {
+            (bool callSuccess,) = receiver.call{value: claimAmount}("");
+
+            require(callSuccess, "Native token transfer failed");
+        } else {
+            IERC20(campaign.rewardToken).safeTransfer(receiver, claimAmount);
+        }
 
         emit Claimed(receiver, claimAmount, sender);
         return true;
