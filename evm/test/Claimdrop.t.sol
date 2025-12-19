@@ -589,11 +589,17 @@ contract ClaimdropTest is Test {
 
         uint256 ownerBalanceBefore = token.balanceOf(owner);
         uint256 contractBalanceBefore = token.balanceOf(address(claimdrop));
+        uint256 totalAllocated = claimdrop.totalAllocated();
+        Claimdrop.Campaign memory c = claimdrop.getCampaign();
+        uint256 claimed = c.claimed;
 
         claimdrop.closeCampaign();
 
         uint256 ownerBalanceAfter = token.balanceOf(owner);
-        assertEq(ownerBalanceAfter - ownerBalanceBefore, contractBalanceBefore);
+        uint256 refundedAmount = ownerBalanceAfter - ownerBalanceBefore;
+
+        uint256 expectedRefund = contractBalanceBefore - (totalAllocated - claimed);
+        assertEq(refundedAmount, expectedRefund, "Refund amount should be balance minus remaining to claim");
     }
 
     function test_RevertWhen_TooManyDistributions() public {
@@ -3093,17 +3099,14 @@ contract ClaimdropTest is Test {
         (, uint256 pendingBefore,) = claimdrop.getRewards(user1);
         assertEq(pendingBefore, 1000 ether, "Should have full allocation available");
 
-        // Close campaign (refunds all remaining tokens to owner)
+        // Close campaign (refunds unallocated tokens)
         claimdrop.closeCampaign();
 
         // Get pending after close - should still show full amount
         (, uint256 pendingAfterClose,) = claimdrop.getRewards(user1);
         assertEq(pendingAfterClose, pendingBefore, "Pending should match pre-close amount");
 
-        // Fund contract to cover pending claims (since closeCampaign refunded everything)
-        token.transfer(address(claimdrop), pendingAfterClose);
-
-        // User should still be able to claim full amount
+        // User should still be able to claim full amount without re-funding
         uint256 balanceBefore = token.balanceOf(user1);
         vm.prank(user1);
         claimdrop.claim(user1, 0);
@@ -3194,25 +3197,29 @@ contract ClaimdropTest is Test {
     /**
      * @notice Test that balance check prevents over-claiming from unfunded contract
      */
-    function test_ClosedCampaignRespectsBalance() public {
+    function test_ClosedCampaignLeavesCorrectBalance() public {
         createTestCampaign();
         addTestAllocations(1, 1000 ether);
 
         // Warp to end time (required for closure)
         warpToEnd();
 
-        (, uint256 pendingBefore,) = claimdrop.getRewards(user1);
-
-        // Close campaign - this refunds all tokens to owner
+        // Close campaign
         claimdrop.closeCampaign();
 
-        // Contract now has 0 balance
-        assertEq(token.balanceOf(address(claimdrop)), 0, "Contract should have 0 balance after close");
+        uint256 expectedBalance = 1000 ether; // Nothing was claimed
+        assertEq(
+            token.balanceOf(address(claimdrop)),
+            expectedBalance,
+            "Contract should have remaining claimable balance after close"
+        );
 
-        // User tries to claim - should revert due to insufficient balance
+        // User should still be able to claim
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(INSUFFICIENT_BALANCE_SELECTOR, pendingBefore, 0));
         claimdrop.claim(user1, 0);
+
+        assertEq(token.balanceOf(user1), 1000 ether);
+        assertEq(token.balanceOf(address(claimdrop)), 0, "Contract balance should be 0 after all claims");
     }
 
     /**
