@@ -725,7 +725,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
             uint256 expectedRemaining = allocation - totalClaimed;
             // Only add dust if there's a discrepancy (rounding error)
             // claimable should equal expectedRemaining, but might be slightly less due to rounding
-            if (expectedRemaining > claimable && expectedRemaining - claimable > 0) {
+            if (expectedRemaining > claimable) {
                 uint256 dust = expectedRemaining - claimable;
                 // Add dust to the first non-zero slot, or slot 0
                 uint256 dustSlot = _findSlotForDust(slotAmounts);
