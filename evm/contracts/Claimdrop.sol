@@ -390,7 +390,6 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         // Transfer blacklist status
         if (blacklist[oldAddress]) {
             blacklist[newAddress] = true;
-            delete blacklist[oldAddress];
         }
 
         // Update investor tracking (replace in array, don't push/pop)
