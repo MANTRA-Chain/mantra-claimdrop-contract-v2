@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import { Test, console } from "forge-std/Test.sol";
 import { Claimdrop } from "../contracts/Claimdrop.sol";
 import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
-import { Allowlist } from "@primary-sale/Allowlist.sol";
+import { Allowlist } from "@primary-sale/packages/evm/contracts/Allowlist.sol";
 
 /**
  * @title ClaimdropTest
