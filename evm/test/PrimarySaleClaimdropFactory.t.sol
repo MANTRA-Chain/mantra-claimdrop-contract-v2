@@ -7,6 +7,7 @@ import { Claimdrop } from "../contracts/Claimdrop.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ITransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { ERC1967Utils } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
 contract PrimarySaleClaimdropFactoryTest is Test {
     PrimarySaleClaimdropFactory public factory;
@@ -31,9 +32,6 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // Deploy the implementation contract
         implementation = new PrimarySaleClaimdropFactory();
 
-        // Deploy ProxyAdmin (no constructor args in newer versions)
-        proxyAdmin = new ProxyAdmin(proxyAdminOwner);
-
         // Prepare initialization data with metadata
         bytes memory initData = abi.encodeWithSelector(
             PrimarySaleClaimdropFactory.initialize.selector,
@@ -44,10 +42,19 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         );
 
         // Deploy the proxy
-        proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdmin), initData);
+        proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdminOwner), initData);
+
+        // Get the ProxyAdmin that was created by the proxy
+        // The proxy's admin is stored at ERC1967 admin slot
+        bytes32 adminSlot = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
+        address proxyAdminAddress = address(uint160(uint256(vm.load(address(proxy), adminSlot))));
+        proxyAdmin = ProxyAdmin(proxyAdminAddress);
 
         // Wrap the proxy in the factory interface
         factory = PrimarySaleClaimdropFactory(address(proxy));
+
+        // Set the PrimarySale address - THIS WAS MISSING
+        factory.setPrimarySaleWithMetadata(mockPrimarySale, 100, 3, 48);
     }
 
     function testDeployClaimdrop() public {
@@ -112,7 +119,7 @@ contract PrimarySaleClaimdropFactoryTest is Test {
     function testGetClaimdropAtIndexRevertsOutOfBounds() public {
         factory.deployClaimdrop();
 
-        vm.expectRevert("Index out of bounds");
+        vm.expectRevert(PrimarySaleClaimdropFactory.IndexOutOfBounds.selector);
         factory.getClaimdropAtIndex(1);
     }
 
@@ -171,7 +178,8 @@ contract PrimarySaleClaimdropFactoryTest is Test {
         // Deploy a new implementation
         PrimarySaleClaimdropFactory newImplementation = new PrimarySaleClaimdropFactory();
 
-        // Upgrade the proxy to the new implementation
+        // Use upgradeAndCall with empty data as required by OpenZeppelin v5.0.0
+        vm.prank(proxyAdminOwner); // Need to be the owner of the proxy admin
         proxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy(address(proxy)), address(newImplementation), "");
 
         // Verify state is preserved
