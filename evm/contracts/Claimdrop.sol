@@ -285,11 +285,8 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         campaign.exists = true;
         campaign.allowlistContract = allowlistContract;
 
-        // Copy distributions
-        delete campaign.distributions;
-        for (uint256 i = 0; i < distributions.length; i++) {
-            campaign.distributions.push(distributions[i]);
-        }
+        // Copy distributions from calldata to storage directly
+        campaign.distributions = distributions;
 
         emit CampaignCreated(name, rewardToken, totalReward, startTime, endTime);
     }
