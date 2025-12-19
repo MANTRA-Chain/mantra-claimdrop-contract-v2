@@ -225,9 +225,7 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
 
     /// @notice Initialize contract with owner
     /// @param initialOwner Address of the initial owner
-    constructor(address initialOwner) {
-        _transferOwnership(initialOwner);
-    }
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     // ============ Campaign Management ============
 
