@@ -325,4 +325,9 @@ contract PrimarySaleClaimdropFactory is Initializable, OwnableUpgradeable, Pausa
             }
         }
     }
+
+    // ============ Storage Gap ============
+    
+    /// @dev Reserve storage gap for future variables
+    uint256[36] private __gap;
 }
