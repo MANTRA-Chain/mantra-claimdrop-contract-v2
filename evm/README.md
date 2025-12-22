@@ -110,9 +110,17 @@ just e2e              # Run complete E2E test on testnet
 just e2e-report       # View E2E transaction report
 ```
 
-### Deploy Primary Sale Claimdrop Factory
+### Primary Sale Claimdrop Factory
+
+#### Deploy
 ```shell
 forge script script/DeployFactory.s.sol:DeployFactory --rpc-url mantra_dukong --broadcast --slow
+```
+
+#### Upgrade
+> Remember to update PROXY_ADDRESS and PROXY_ADMIN_ADDRESS in UpgradeFactory.s.sol
+```shell
+forge script script/UpgradeFactory.s.sol:UpgradeFactory --rpc-url mantra_dukong --broadcast --slow
 ```
 
 ## Production-Grade Cast Scripts
