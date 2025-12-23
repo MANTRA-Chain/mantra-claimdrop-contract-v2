@@ -123,6 +123,12 @@ forge script script/DeployFactory.s.sol:DeployFactory --rpc-url mantra_dukong --
 forge script script/UpgradeFactory.s.sol:UpgradeFactory --rpc-url mantra_dukong --broadcast --slow
 ```
 
+### Pyse Oracle contract
+#### Deploy
+```shell
+forge script script/DeployPyseOracle.s.sol:DeployPyseOracle --rpc-url mantra_dukong --broadcast
+```
+
 ## Production-Grade Cast Scripts
 
 **⚠️ IMPORTANT: Cast scripts are the preferred deployment method for this project.**
