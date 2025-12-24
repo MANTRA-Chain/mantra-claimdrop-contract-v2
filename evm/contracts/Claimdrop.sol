@@ -617,10 +617,10 @@ contract Claimdrop is Ownable2Step, ReentrancyGuard, Pausable {
         claimed = _getTotalClaimedForAddress(addr);
 
         // Allow pending calculation even after closure (vesting frozen at closedAt)
-        if (campaign.exists && block.timestamp >= campaign.startTime) {
-            (pending,) = _computeClaimableAmount(addr, total);
-        } else if (isBlacklisted(addr)) {
+        if (isBlacklisted(addr)) {
             pending = 0;
+        } else if (campaign.exists && block.timestamp >= campaign.startTime) {
+            (pending,) = _computeClaimableAmount(addr, total);
         } else {
             pending = 0;
         }

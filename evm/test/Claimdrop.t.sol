@@ -3274,7 +3274,7 @@ contract ClaimdropTest is Test {
         assertEq(total, 1000 ether, "Total should be the allocation amount");
     }
 
-    function test_ShouldReturnVestedAmountForBlacklistedUserAfterCampaignStart() public {
+    function test_ShouldReturnZeroAmountForBlacklistedUserAfterCampaignStart() public {
         createTestCampaign(); // 30% lump sum, 70% vesting
         addTestAllocations(1, 1000 ether); // User1 gets 300 lump, 700 vesting
 
@@ -3284,14 +3284,14 @@ contract ClaimdropTest is Test {
         // Warp to start. `getRewards` should now enter the first `if` branch.
         warpToStart();
         (, uint256 pending,) = claimdrop.getRewards(user1);
-        assertEq(pending, 300 ether, "Pending should show vested amount for blacklisted user after start");
+        assertEq(pending, 0 ether, "Pending should show vested amount for blacklisted user after start");
 
         // At 50% through vesting period
         uint256 halfTime = startTime + (endTime - startTime) / 2;
         vm.warp(halfTime);
         (, uint256 pending50,) = claimdrop.getRewards(user1);
         // 300 from lump sum + 350 from vesting (50% of 700)
-        assertApproxEqAbs(pending50, 650 ether, 1 ether, "Pending should include vested amount for blacklisted user");
+        assertApproxEqAbs(pending50, 0 ether, 1 ether, "Pending should include vested amount for blacklisted user");
 
         // And check that claiming is reverted, because user is blacklisted.
         vm.prank(user1);
