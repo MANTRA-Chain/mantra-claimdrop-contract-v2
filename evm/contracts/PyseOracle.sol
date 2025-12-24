@@ -23,7 +23,7 @@ contract PyseOracle {
 
     constructor(address claimDropFactory_) {
         decimals = 6;
-        initialPrice = 5000_000000;
+        initialPrice = 5000e6; // $5000 with 6 decimals
         PrimarySaleClaimdropFactoryContract = PrimarySaleClaimdropFactory(claimDropFactory_);
     }
 
@@ -32,7 +32,7 @@ contract PyseOracle {
         uint256 interestOnlyPeriod = PrimarySaleClaimdropFactoryContract.interestOnlyPeriod();
         uint256 repaymentPeriod = PrimarySaleClaimdropFactoryContract.repaymentPeriod();
 
-        if (distributedCount == interestOnlyPeriod + repaymentPeriod) {
+        if (distributedCount >= interestOnlyPeriod + repaymentPeriod) {
             return 0;
         } else if (distributedCount <= repaymentPeriod) {
             return initialPrice;

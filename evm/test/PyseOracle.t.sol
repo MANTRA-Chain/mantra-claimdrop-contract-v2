@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import { Test, console } from "forge-std/Test.sol";
 import { PyseOracle } from "../contracts/PyseOracle.sol";
 import { PrimarySaleClaimdropFactory } from "../contracts/PrimarySaleClaimdropFactory.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { MockERC20 } from "../contracts/mocks/MockERC20.sol";
 
 /// TODO: Unfinished tests
@@ -11,29 +12,48 @@ contract PyseOracleTest is Test {
     PyseOracle public pyseOracle;
     PrimarySaleClaimdropFactory public factory;
     MockERC20 public token;
+    address public owner;
 
     uint256 public constant INTEREST_ONLY_PERIOD = 3;
     uint256 public constant REPAYMENT_PERIOD = 48;
     uint256 public constant INITIAL_PRICE = 5000_000000;
 
-    function setUp() public {
-        // Deploy and initialize the factory
-        factory = new PrimarySaleClaimdropFactory();
-        
+    function setUpFactory() public {
+        owner = address(this);
+        address proxyAdminOwner = address(this);
+        address mockPrimarySale = address(0x999);
 
-        // Set up the primary sale metadata required by the oracle
-        factory.setPrimarySaleWithMetadata(
-            address(0xdeadbeef), // mock primary sale address
-            1000, // 10% rate
-            INTEREST_ONLY_PERIOD,
-            REPAYMENT_PERIOD
+        // Deploy the implementation contract
+        PrimarySaleClaimdropFactory implementation = new PrimarySaleClaimdropFactory();
+
+        // Prepare initialization data with metadata
+        bytes memory initData = abi.encodeWithSelector(
+            PrimarySaleClaimdropFactory.initialize.selector,
+            owner,
+            "Test Factory",
+            "test-factory",
+            "Test factory for unit tests"
         );
+
+        // Deploy the proxy
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(address(implementation), address(proxyAdminOwner), initData);
+
+        // Wrap the proxy in the factory interface
+        factory = PrimarySaleClaimdropFactory(address(proxy));
+
+        // Set the PrimarySale address - THIS WAS MISSING
+        factory.setPrimarySaleWithMetadata(mockPrimarySale, 100, INTEREST_ONLY_PERIOD, REPAYMENT_PERIOD);
+    }
+
+    function setUp() public {
+        // Deploy and set up the factory
+        setUpFactory();
 
         // Deploy the oracle with the factory address
         pyseOracle = new PyseOracle(address(factory));
     }
 
-    function test_initialPrice() public {
+    function test_initialPrice() public view {
         // Initially, with 0 claimdrops deployed, the price should be the initial price.
         assertEq(pyseOracle.getLatestPrice(), INITIAL_PRICE, "Initial price should be 5000e6");
     }
